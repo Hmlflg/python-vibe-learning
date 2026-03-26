@@ -1,0 +1,32 @@
+[
+    {
+        "description": "Обед в кафе",
+        "amount": 450.0,
+        "category": "еда",
+        "date": "2026-03-24"
+    },
+    {
+        "description": "Билет на метро",
+        "amount": 55.0,
+        "category": "транспорт",
+        "date": "2026-03-24"
+    },
+    {
+        "description": "Кино",
+        "amount": 200.0,
+        "category": "развлечения",
+        "date": "2026-03-25"
+    },
+    {
+        "description": "Продукты",
+        "amount": 1200.0,
+        "category": "еда",
+        "date": "2026-03-25"
+    },
+    {
+        "description": "Такси",
+        "amount": 350.0,
+        "category": "транспорт",
+        "date": "2026-03-26"
+    }
+]
