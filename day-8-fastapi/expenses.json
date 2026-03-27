@@ -1,0 +1,32 @@
+[
+    {
+        "description": "Обед в кафе",
+        "amount": 850.5,
+        "category": "Еда",
+        "date": "2026-03-25"
+    },
+    {
+        "description": "Проезд на метро",
+        "amount": 80.0,
+        "category": "Транспорт",
+        "date": "2026-03-24"
+    },
+    {
+        "description": "Кофе навынос",
+        "amount": 250.0,
+        "category": "Еда",
+        "date": "2026-03-26"
+    },
+    {
+        "description": "Подписка на YouTube Premium",
+        "amount": 799.0,
+        "category": "Развлечения",
+        "date": "2026-03-20"
+    },
+    {
+        "description": "Продукты в Пятёрочке",
+        "amount": 1240.75,
+        "category": "Еда",
+        "date": "2026-03-27"
+    }
+]
