@@ -9,8 +9,14 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from database import get_db
 from dotenv import load_dotenv
+from keyboards import (
+    get_cancel_keyboard,  # если ещё не импортировано
+    get_main_keyboard,
+)
+from repository import add_expense, get_all_expenses, get_statistics
+from sqlalchemy.orm import Session
 
 load_dotenv()
 
@@ -36,28 +42,19 @@ dp = Dispatcher()
 user_data = {}
 
 
-def load_expenses() -> list[dict]:
-    if DATA_FILE.exists():
-        try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+# def load_expenses() -> list[dict]:
+#     if DATA_FILE.exists():
+#         try:
+#             with open(DATA_FILE, "r", encoding="utf-8") as f:
+#                 return json.load(f)
+#         except Exception:
+#             return []
+#     return []
 
 
-def save_expenses(expenses: list[dict]):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(expenses, f, ensure_ascii=False, indent=2)
-
-
-def get_main_keyboard():
-    kb = [
-        [KeyboardButton(text="➕ Добавить расход")],
-        [KeyboardButton(text="📋 Все расходы")],
-        [KeyboardButton(text="📊 Статистика")],
-    ]
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+# def save_expenses(expenses: list[dict]):
+#     with open(DATA_FILE, "w", encoding="utf-8") as f:
+#         json.dump(expenses, f, ensure_ascii=False, indent=2)
 
 
 # Хранилище состояний пользователя
@@ -74,32 +71,47 @@ async def cmd_start(message: types.Message):
 
 @dp.message(lambda m: m.text == "📋 Все расходы")
 async def show_all_expenses(message: types.Message):
-    expenses = load_expenses()
+    db = next(get_db())
+    expenses = get_all_expenses(db, limit=15)
+
     if not expenses:
-        await message.answer("Пока нет расходов.")
+        await message.answer("📭 Пока нет расходов.")
         return
 
     text = "📋 <b>Последние расходы:</b>\n\n"
-    for exp in reversed(expenses[-10:]):
-        text += f"• {exp.get('date')} | <b>{exp.get('category')}</b> | {exp.get('amount')} руб.\n"
-        if exp.get("description"):
-            text += f"  {exp.get('description')}\n"
+    for exp in expenses:
+        text += f"• {exp.date.strftime('%Y-%m-%d %H:%M')} | <b>{exp.category}</b> | {exp.amount} руб.\n"
+
+        # Надёжное извлечение описания
+        description = (
+            str(exp.description).strip() if exp.description is not None else ""
+        )
+        if description:
+            text += f"  📝 {description}\n"
+
         text += "\n"
+
     await message.answer(text)
 
 
 @dp.message(lambda m: m.text == "📊 Статистика")
 async def show_stats(message: types.Message):
-    expenses = load_expenses()
-    if not expenses:
-        await message.answer("Нет данных для статистики.")
-        return
+    db = next(get_db())
+    stats = get_statistics(db)
 
-    total = sum(exp.get("amount", 0) for exp in expenses)
-    count = len(expenses)
-    avg = round(total / count, 2) if count > 0 else 0
+    text = (
+        "📊 <b>Статистика расходов</b>\n\n"
+        f"💰 Всего записей: <b>{stats['count']}</b>\n"
+        f"💵 Общая сумма: <b>{stats['total']}</b> руб.\n"
+        f"📈 Средний расход: <b>{stats['avg']}</b> руб.\n\n"
+        "📂 По категориям:\n"
+    )
 
-    text = f"📊 <b>Статистика</b>\n\nВсего: {count}\nСумма: {total:.2f} руб.\nСредний: {avg:.2f} руб."
+    for cat, amount in sorted(
+        stats["categories"].items(), key=lambda x: x[1], reverse=True
+    ):
+        text += f"• {cat}: <b>{amount:.2f}</b> руб.\n"
+
     await message.answer(text)
 
 
@@ -110,11 +122,14 @@ async def start_add_expense(message: types.Message):
     user_id = message.from_user.id
     user_data[user_id] = {"step": "category"}
     await message.answer(
-        "💸 Введите категорию расхода:\n(например: Еда, Транспорт, Развлечения)"
+        "💸 Введите категорию расхода:\n"
+        "(например: Еда, Транспорт, Развлечения, Техника)",
+        reply_markup=get_cancel_keyboard(),
     )
 
 
 @dp.message(Command("cancel"))
+@dp.message(lambda m: m.text == "❌ Отмена")
 async def cancel_handler(message: types.Message):
     if not message.from_user:
         return
@@ -138,9 +153,11 @@ async def handle_input(message: types.Message):
     text = message.text.strip()
 
     if state["step"] == "category":
-        state["category"] = text
+        state["category"] = text.strip().capitalize()  # нормализация категории
         state["step"] = "amount"
-        await message.answer("💵 Введите сумму:")
+        await message.answer(
+            "💵 Введите сумму расхода:", reply_markup=get_cancel_keyboard()
+        )
 
     elif state["step"] == "amount":
         try:
@@ -149,22 +166,21 @@ async def handle_input(message: types.Message):
                 raise ValueError
             state["amount"] = amount
             state["step"] = "description"
-            await message.answer("📝 Введите описание (или '-' для пропуска):")
+            await message.answer(
+                "📝 Введите описание (или '-' для пропуска):",
+                reply_markup=get_cancel_keyboard(),
+            )
         except ValueError:
-            await message.answer("❌ Введите корректную сумму.")
+            await message.answer(
+                "❌ Введите корректную сумму (например: 500 или 1250.50)",
+                reply_markup=get_cancel_keyboard(),
+            )
 
     elif state["step"] == "description":
         description = "" if text == "-" else text
 
-        expenses = load_expenses()
-        new_expense = {
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "category": state["category"],
-            "amount": state["amount"],
-            "description": description,
-        }
-        expenses.append(new_expense)
-        save_expenses(expenses)
+        db = next(get_db())  # ← новая строка
+        add_expense(db, state["category"], state["amount"], description)
 
         del user_data[user_id]
 
