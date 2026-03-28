@@ -9,6 +9,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 from database import get_db
 from dotenv import load_dotenv
 from keyboards import (
@@ -19,6 +20,22 @@ from repository import add_expense, get_all_expenses, get_statistics
 from sqlalchemy.orm import Session
 
 load_dotenv()
+
+# Популярные категории
+POPULAR_CATEGORIES = [
+    "Еда",
+    "Транспорт",
+    "Развлечения",
+    "Техника",
+    "Коммуналка",
+    "Здоровье",
+    "Одежда",
+    "Супермаркет",
+    "Кафе",
+    "Такси",
+    "Подписки",
+    "Другое",
+]
 
 bot_token_raw = os.getenv("BOT_TOKEN")
 if not bot_token_raw:
@@ -115,16 +132,29 @@ async def show_stats(message: types.Message):
     await message.answer(text)
 
 
+def get_categories_keyboard():
+    """Клавиатура с популярными категориями"""
+    kb = []
+    row = []
+    for cat in POPULAR_CATEGORIES:
+        row.append(KeyboardButton(text=cat))
+        if len(row) == 2:  # по 2 кнопки в ряд
+            kb.append(row)
+            row = []
+    if row:
+        kb.append(row)
+    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+
+
 @dp.message(lambda m: m.text == "➕ Добавить расход")
 async def start_add_expense(message: types.Message):
     if not message.from_user:
         return
     user_id = message.from_user.id
     user_data[user_id] = {"step": "category"}
+
     await message.answer(
-        "💸 Введите категорию расхода:\n"
-        "(например: Еда, Транспорт, Развлечения, Техника)",
-        reply_markup=get_cancel_keyboard(),
+        "💸 Выберите категорию расхода:", reply_markup=get_categories_keyboard()
     )
 
 
@@ -153,7 +183,8 @@ async def handle_input(message: types.Message):
     text = message.text.strip()
 
     if state["step"] == "category":
-        state["category"] = text.strip().capitalize()  # нормализация категории
+        # Проверяем, что категория есть в популярных или принимаем любую
+        state["category"] = text
         state["step"] = "amount"
         await message.answer(
             "💵 Введите сумму расхода:", reply_markup=get_cancel_keyboard()
