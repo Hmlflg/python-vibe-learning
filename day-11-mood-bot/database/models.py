@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text
+from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -17,9 +17,6 @@ class MoodEntry(Base):
 
     # Основная оценка настроения (эмодзи)
     mood_emoji = Column(String(10), nullable=False)
-
-    # Теги эмоций (храним как строку через запятую, например: "Радость,Энергия")
-    tags = Column(Text, nullable=True)
 
     # Комментарий пользователя
     comment = Column(Text, nullable=True)

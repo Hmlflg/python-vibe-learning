@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import config
 from aiogram import Bot, Dispatcher
@@ -6,25 +7,23 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from bot.handlers.handlers import (
-    cancel_handler,
-    cmd_start,
-    process_comment,
-    process_mood_emoji,
-    show_history,
-    show_stats,
-    start_mood_entry,
-)
+from bot.handlers.handlers import router
 from bot.states import MoodStates
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 async def main():
-    print("🤖 Запуск бота Mood...")
+    logger.info("🤖 Запуск бота Mood...")
 
     bot = None
     for proxy_url, name in config.PROXIES:
         try:
-            print(f"🔍 Пробую подключиться: {name}")
+            logger.info(f"🔍 Пробую подключиться: {name}")
 
             if proxy_url:
                 session = AiohttpSession(proxy=proxy_url)
@@ -40,11 +39,11 @@ async def main():
                 )
 
             await bot.get_me()
-            print(f"✅ Успешно подключено через: {name}")
+            logger.info(f"✅ Успешно подключено через: {name}")
             break
 
         except Exception as e:
-            print(f"❌ Не удалось через {name}: {str(e)[:80]}")
+            logger.warning(f"❌ Не удалось через {name}: {str(e)[:80]}")
             continue
 
     if bot is None:
@@ -54,17 +53,11 @@ async def main():
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
-    # Регистрация обработчиков
-    dp.message.register(cmd_start, lambda m: m.text == "/start")
-    dp.message.register(start_mood_entry, lambda m: m.text == "➕ Записать настроение")
-    dp.message.register(show_history, lambda m: m.text == "📅 История")
-    dp.message.register(show_stats, lambda m: m.text == "📊 Моя статистика")
-    dp.message.register(process_mood_emoji, MoodStates.waiting_for_mood)
-    dp.message.register(process_comment, MoodStates.waiting_for_comment)
-    dp.message.register(cancel_handler, lambda m: m.text == "❌ Отмена")
+    # Регистрация роутера
+    dp.include_router(router)
 
-    print("✅ Бот Mood готов к работе!")
-    print("🏃 Ожидает сообщений от пользователей...")
+    logger.info("✅ Бот Mood готов к работе!")
+    logger.info("🏃 Ожидает сообщений от пользователей...")
 
     await dp.start_polling(bot)
 

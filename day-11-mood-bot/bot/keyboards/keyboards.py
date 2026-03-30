@@ -10,49 +10,66 @@ def get_main_keyboard():
     """Главное меню бота"""
     kb = [
         [KeyboardButton(text="➕ Записать настроение")],
-        [KeyboardButton(text="📊 Моя статистика")],
-        [KeyboardButton(text="📅 История")],
+        [KeyboardButton(text="📅 История"), KeyboardButton(text="📊 Моя статистика")],
+        [KeyboardButton(text="🗓 Календарь")],
+        [KeyboardButton(text="❓ Помощь")],
     ]
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+    return ReplyKeyboardMarkup(
+        keyboard=kb, resize_keyboard=True, input_field_placeholder="Выбери действие..."
+    )
 
 
-def get_mood_keyboard():
-    """Клавиатура выбора настроения (5 вариантов)"""
+def get_mood_inline_keyboard():
+    """Inline-клавиатура выбора настроения (5 вариантов)"""
     kb = [
-        [KeyboardButton(text="😊 Отличное")],
-        [KeyboardButton(text="🙂 Хорошее")],
-        [KeyboardButton(text="😐 Нормальное")],
-        [KeyboardButton(text="😔 Плохое")],
-        [KeyboardButton(text="😢 Ужасное")],
-        [KeyboardButton(text="❌ Отмена")],
+        [InlineKeyboardButton(text="😊 Отличное", callback_data="mood_😊")],
+        [InlineKeyboardButton(text="🙂 Хорошее", callback_data="mood_🙂")],
+        [InlineKeyboardButton(text="😐 Нормальное", callback_data="mood_😐")],
+        [InlineKeyboardButton(text="😔 Плохое", callback_data="mood_😔")],
+        [InlineKeyboardButton(text="😢 Ужасное", callback_data="mood_😢")],
+        [InlineKeyboardButton(text="🔙 Главное меню", callback_data="cancel_to_menu")],
     ]
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-    """Клавиатура выбора настроения (эмодзи)"""
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+
+
+def get_confirm_keyboard():
+    """Клавиатура подтверждения сохранения"""
     kb = [
         [
-            KeyboardButton(text="😊"),
-            KeyboardButton(text="🥰"),
-            KeyboardButton(text="😌"),
-            KeyboardButton(text="⚡"),
+            InlineKeyboardButton(text="✅ Сохранить", callback_data="confirm_save"),
+            InlineKeyboardButton(text="✏️ Изменить", callback_data="confirm_edit"),
         ],
         [
-            KeyboardButton(text="😔"),
-            KeyboardButton(text="😟"),
-            KeyboardButton(text="😠"),
-            KeyboardButton(text="😴"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data="confirm_cancel"),
         ],
-        [
-            KeyboardButton(text="🔥"),
-            KeyboardButton(text="🙏"),
-            KeyboardButton(text="🏆"),
-            KeyboardButton(text="😤"),
-        ],
-        [KeyboardButton(text="❌ Отмена")],
     ]
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+    return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-def get_cancel_keyboard():
-    """Простая клавиатура отмены"""
-    kb = [[KeyboardButton(text="❌ Отмена")]]
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+def get_cancel_inline_keyboard():
+    """Inline-клавиатура отмены"""
+    kb = [[InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")]]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def get_stats_period_keyboard(current_period: str = "all"):
+    """Inline-клавиатура выбора периода для статистики"""
+    kb = [
+        [
+            InlineKeyboardButton(
+                text="📅 Неделя" + (" ✅" if current_period == "week" else ""),
+                callback_data="stats_period_week",
+            ),
+            InlineKeyboardButton(
+                text="📆 Месяц" + (" ✅" if current_period == "month" else ""),
+                callback_data="stats_period_month",
+            ),
+            InlineKeyboardButton(
+                text="📊 Всё" + (" ✅" if current_period == "all" else ""),
+                callback_data="stats_period_all",
+            ),
+        ],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=kb)

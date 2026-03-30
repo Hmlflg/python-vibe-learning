@@ -5,5 +5,11 @@ class MoodStates(StatesGroup):
     """Состояния для процесса записи настроения"""
 
     waiting_for_mood = State()  # ожидание выбора эмодзи
-    waiting_for_tags = State()  # ожидание выбора тегов
     waiting_for_comment = State()  # ожидание комментария
+    waiting_for_confirm = State()  # ожидание подтверждения
+
+
+class StatsStates(StatesGroup):
+    """Состояния для просмотра статистики"""
+
+    viewing_stats = State()  # просмотр статистики с выбором периода
