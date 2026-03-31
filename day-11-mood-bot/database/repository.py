@@ -21,12 +21,14 @@ def add_mood_entry(
     db: Session,
     user_id: int,
     mood_emoji: str,
+    reason: str | None = None,
     comment: str | None = None,
 ):
     """Добавляет новую запись состояния."""
     entry = MoodEntry(
         user_id=user_id,
         mood_emoji=mood_emoji,
+        reason=reason,
         comment=comment,
         timestamp=utc_now(),
     )
@@ -95,10 +97,12 @@ def update_mood_entry(
     db: Session,
     entry: MoodEntry,
     mood_emoji: str,
+    reason: str | None = None,
     comment: str | None = None,
 ):
     """Обновляет существующую запись состояния."""
     entry.mood_emoji = mood_emoji
+    entry.reason = reason
     entry.comment = comment
     entry.timestamp = utc_now()
     try:
@@ -158,6 +162,7 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
         return {
             "total": 0,
             "moods": {},
+            "reasons": {},
             "avg_per_day": 0,
             "period": period,
             "streak": 0,
@@ -167,6 +172,9 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
             "tracking_days": 0,
             "best_day": None,
             "worst_day": None,
+            "top_reasons": [],
+            "negative_reasons": [],
+            "positive_reasons": [],
         }
 
     if period == "all":
@@ -174,25 +182,42 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
         newest_entry = entries[0].timestamp.date()
         days_count = max((newest_entry - oldest_entry).days + 1, 1)
         period_start = oldest_entry
-    
+
     total = len(entries)
     mood_count = {}
+    reason_count = {}
+    negative_reason_count = {}
+    positive_reason_count = {}
     day_scores = {}
     unique_days = set()
-    
+
     for entry in entries:
         emoji = entry.mood_emoji
         mood_count[emoji] = mood_count.get(emoji, 0) + 1
+        reason = entry.reason or "none"
+        reason_count[reason] = reason_count.get(reason, 0) + 1
+
+        score = MOOD_SCORES.get(emoji, 3)
+        if score <= 2:
+            negative_reason_count[reason] = negative_reason_count.get(reason, 0) + 1
+        elif score >= 4:
+            positive_reason_count[reason] = positive_reason_count.get(reason, 0) + 1
+
         entry_day = entry.timestamp.date()
         unique_days.add(entry_day)
-        day_scores.setdefault(entry_day, []).append(MOOD_SCORES.get(emoji, 3))
-    
+        day_scores.setdefault(entry_day, []).append(score)
+
     # Расчёт процентов
     mood_stats = {}
     for emoji, count in mood_count.items():
         percent = round((count / total) * 100)
         mood_stats[emoji] = {"count": count, "percent": percent}
-    
+
+    reason_stats = {}
+    for reason, count in reason_count.items():
+        percent = round((count / total) * 100)
+        reason_stats[reason] = {"count": count, "percent": percent}
+
     # Расчёт серии дней (streak)
     streak = calculate_streak(entries)
 
@@ -212,8 +237,8 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
         day_averages = {
             day: sum(scores) / len(scores) for day, scores in day_scores.items()
         }
-        best_day_date = max(day_averages, key=day_averages.get)
-        worst_day_date = min(day_averages, key=day_averages.get)
+        best_day_date = max(day_averages, key=lambda day: day_averages[day])
+        worst_day_date = min(day_averages, key=lambda day: day_averages[day])
         best_day = {
             "date": best_day_date,
             "score": round(day_averages[best_day_date], 1),
@@ -222,10 +247,27 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
             "date": worst_day_date,
             "score": round(day_averages[worst_day_date], 1),
         }
-    
+
+    top_reasons = sorted(
+        reason_stats.items(),
+        key=lambda item: (item[1]["count"], item[1]["percent"]),
+        reverse=True,
+    )[:3]
+    negative_reasons = sorted(
+        negative_reason_count.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )[:3]
+    positive_reasons = sorted(
+        positive_reason_count.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )[:3]
+
     return {
         "total": total,
         "moods": mood_stats,
+        "reasons": reason_stats,
         "avg_per_day": round(total / days_count, 1),
         "period": period,
         "streak": streak,
@@ -235,6 +277,9 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
         "tracking_days": max((now.date() - period_start).days + 1, 1),
         "best_day": best_day,
         "worst_day": worst_day,
+        "top_reasons": top_reasons,
+        "negative_reasons": negative_reasons,
+        "positive_reasons": positive_reasons,
     }
 
 
@@ -259,5 +304,5 @@ def calculate_streak(entries) -> int:
             expected_date = date - timedelta(days=1)
         else:
             break
-    
+
     return streak

@@ -1,5 +1,6 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import OperationalError
 
 from database.models import create_tables
 
@@ -15,7 +16,29 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Создаём таблицы при импорте (если их ещё нет)
-create_tables(engine)
+try:
+    create_tables(engine)
+except OperationalError:
+    pass
+
+
+def ensure_schema():
+    """Добавляет недостающие колонки в существующую SQLite-схему."""
+    try:
+        inspector = inspect(engine)
+        columns = {column["name"] for column in inspector.get_columns("mood_entries")}
+
+        with engine.begin() as connection:
+            if "reason" not in columns:
+                connection.execute(
+                    text("ALTER TABLE mood_entries ADD COLUMN reason VARCHAR(50)")
+                )
+    except OperationalError:
+        # Если файл SQLite сейчас недоступен, не валим импорт приложения.
+        pass
+
+
+ensure_schema()
 
 
 def create_session():

@@ -30,8 +30,38 @@ def get_mood_inline_keyboard():
         [InlineKeyboardButton(text="🔙 Главное меню", callback_data="cancel_to_menu")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
-
-
+def get_reason_inline_keyboard():
+    """Inline-клавиатура выбора причины состояния."""
+    kb = [
+        [
+            InlineKeyboardButton(text="👨‍👩‍👧‍👦 Семья", callback_data="reason_family"),
+            InlineKeyboardButton(text="❤️ Отношения", callback_data="reason_relationships"),
+        ],
+        [
+            InlineKeyboardButton(text="🫂 Друзья", callback_data="reason_friends"),
+            InlineKeyboardButton(text="🌦 Погода", callback_data="reason_weather"),
+        ],
+        [
+            InlineKeyboardButton(text="💼 Работа", callback_data="reason_work"),
+            InlineKeyboardButton(text="🩺 Здоровье", callback_data="reason_health"),
+        ],
+        [
+            InlineKeyboardButton(text="😴 Сон", callback_data="reason_sleep"),
+            InlineKeyboardButton(text="💰 Деньги", callback_data="reason_money"),
+        ],
+        [
+            InlineKeyboardButton(text="📚 Учёба", callback_data="reason_study"),
+            InlineKeyboardButton(text="🧠 Эмоции", callback_data="reason_emotions"),
+        ],
+        [
+            InlineKeyboardButton(text="🌦 Другое", callback_data="reason_other"),
+        ],
+        [
+            InlineKeyboardButton(text="⏭️ Без причины", callback_data="reason_none"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+        ],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
 def get_confirm_keyboard():
@@ -54,12 +84,23 @@ def get_cancel_inline_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-def get_comment_action_keyboard():
+def get_comment_action_keyboard(template_buttons):
     """Inline-клавиатура для шага комментария."""
-    kb = [
-        [InlineKeyboardButton(text="➡️ Пропустить", callback_data="skip_comment")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
-    ]
+    kb = []
+
+    for i in range(0, len(template_buttons), 2):
+        row = [
+            InlineKeyboardButton(text=label, callback_data=callback_data)
+            for label, callback_data in template_buttons[i : i + 2]
+        ]
+        kb.append(row)
+
+    kb.extend(
+        [
+            [InlineKeyboardButton(text="➡️ Пропустить", callback_data="skip_comment")],
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+        ]
+    )
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 

@@ -22,6 +22,9 @@ class MoodEntry(Base):
     # Основная оценка состояния через эмодзи
     mood_emoji: Mapped[str] = mapped_column(String(10), nullable=False)
 
+    # Причина состояния
+    reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Комментарий пользователя
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
