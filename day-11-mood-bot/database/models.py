@@ -1,25 +1,29 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 class MoodEntry(Base):
-    """Модель записи настроения в базе данных"""
+    """Модель записи состояния в базе данных."""
 
     __tablename__ = "mood_entries"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
 
-    # Основная оценка настроения (эмодзи)
-    mood_emoji = Column(String(10), nullable=False)
+    # Основная оценка состояния через эмодзи
+    mood_emoji: Mapped[str] = mapped_column(String(10), nullable=False)
 
     # Комментарий пользователя
-    comment = Column(Text, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 # Эта функция будет вызвана один раз при первом запуске

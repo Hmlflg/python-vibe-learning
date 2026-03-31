@@ -2,7 +2,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 
 class MoodStates(StatesGroup):
-    """Состояния для процесса записи настроения"""
+    """Состояния для процесса записи состояния"""
 
     waiting_for_mood = State()  # ожидание выбора эмодзи
     waiting_for_comment = State()  # ожидание комментария

@@ -18,6 +18,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 create_tables(engine)
 
 
+def create_session():
+    """Возвращает новую сессию базы данных."""
+    return SessionLocal()
+
+
 def get_db():
     """Генератор для получения сессии базы данных"""
     db = SessionLocal()

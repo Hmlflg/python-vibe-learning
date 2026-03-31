@@ -8,7 +8,6 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from bot.handlers.handlers import router
-from bot.states import MoodStates
 
 logging.basicConfig(
     level=logging.INFO,

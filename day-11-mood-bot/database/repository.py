@@ -1,7 +1,20 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from database.models import MoodEntry
 from sqlalchemy.orm import Session
+
+MOOD_SCORES = {
+    "😊": 5,
+    "🙂": 4,
+    "😐": 3,
+    "😔": 2,
+    "😢": 1,
+}
+
+
+def utc_now() -> datetime:
+    """Возвращает текущее UTC-время без timezone в формате, совместимом с SQLite."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def add_mood_entry(
@@ -10,15 +23,19 @@ def add_mood_entry(
     mood_emoji: str,
     comment: str | None = None,
 ):
-    """Добавляет новую запись настроения"""
+    """Добавляет новую запись состояния."""
     entry = MoodEntry(
         user_id=user_id,
         mood_emoji=mood_emoji,
         comment=comment,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
     db.add(entry)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(entry)
     return entry
 
@@ -36,7 +53,7 @@ def get_user_entries(db: Session, user_id: int, limit: int = 50):
 
 def get_entries_by_period(db: Session, user_id: int, days: int = 30):
     """Получает записи за последние N дней"""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = utc_now() - timedelta(days=days)
     return (
         db.query(MoodEntry)
         .filter(MoodEntry.user_id == user_id)
@@ -46,20 +63,97 @@ def get_entries_by_period(db: Session, user_id: int, days: int = 30):
     )
 
 
+def get_entries_for_date(db: Session, user_id: int, target_date):
+    """Получает записи пользователя за конкретную дату."""
+    start_date = datetime.combine(target_date, datetime.min.time())
+    end_date = start_date + timedelta(days=1)
+    return (
+        db.query(MoodEntry)
+        .filter(MoodEntry.user_id == user_id)
+        .filter(MoodEntry.timestamp >= start_date)
+        .filter(MoodEntry.timestamp < end_date)
+        .order_by(MoodEntry.timestamp.desc())
+        .all()
+    )
+
+
+def get_latest_entry_for_day(db: Session, user_id: int, target_date):
+    """Возвращает последнюю запись пользователя за указанную дату."""
+    start_date = datetime.combine(target_date, datetime.min.time())
+    end_date = start_date + timedelta(days=1)
+    return (
+        db.query(MoodEntry)
+        .filter(MoodEntry.user_id == user_id)
+        .filter(MoodEntry.timestamp >= start_date)
+        .filter(MoodEntry.timestamp < end_date)
+        .order_by(MoodEntry.timestamp.desc())
+        .first()
+    )
+
+
+def update_mood_entry(
+    db: Session,
+    entry: MoodEntry,
+    mood_emoji: str,
+    comment: str | None = None,
+):
+    """Обновляет существующую запись состояния."""
+    entry.mood_emoji = mood_emoji
+    entry.comment = comment
+    entry.timestamp = utc_now()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(entry)
+    return entry
+
+
+def get_entries_for_month(db: Session, user_id: int, year: int, month: int):
+    """Получает записи пользователя за конкретный месяц."""
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+
+    return (
+        db.query(MoodEntry)
+        .filter(MoodEntry.user_id == user_id)
+        .filter(MoodEntry.timestamp >= start_date)
+        .filter(MoodEntry.timestamp < end_date)
+        .order_by(MoodEntry.timestamp.desc())
+        .all()
+    )
+
+
 def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
-    """Статистика по настроению пользователя с периодами"""
-    now = datetime.utcnow()
-    
-    if period == "week":
+    """Возвращает статистику состояний пользователя по периодам."""
+    now = utc_now()
+
+    if period == "day":
+        entries = get_entries_for_date(db, user_id, now.date())
+        days_count = 1
+        period_start = now.date()
+    elif period == "week":
         entries = get_entries_by_period(db, user_id, days=7)
         days_count = 7
+        period_start = (now - timedelta(days=6)).date()
     elif period == "month":
         entries = get_entries_by_period(db, user_id, days=30)
         days_count = 30
+        period_start = (now - timedelta(days=29)).date()
     else:  # "all"
-        entries = get_user_entries(db, user_id, limit=1000)
-        days_count = 30  # по умолчанию
-    
+        entries = (
+            db.query(MoodEntry)
+            .filter(MoodEntry.user_id == user_id)
+            .order_by(MoodEntry.timestamp.desc())
+            .all()
+        )
+        days_count = 1
+        period_start = entries[-1].timestamp.date() if entries else now.date()
+
     if not entries:
         return {
             "total": 0,
@@ -67,14 +161,31 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
             "avg_per_day": 0,
             "period": period,
             "streak": 0,
+            "active_days": 0,
+            "dominant_mood": None,
+            "latest_entry": None,
+            "tracking_days": 0,
+            "best_day": None,
+            "worst_day": None,
         }
+
+    if period == "all":
+        oldest_entry = entries[-1].timestamp.date()
+        newest_entry = entries[0].timestamp.date()
+        days_count = max((newest_entry - oldest_entry).days + 1, 1)
+        period_start = oldest_entry
     
     total = len(entries)
     mood_count = {}
+    day_scores = {}
+    unique_days = set()
     
     for entry in entries:
         emoji = entry.mood_emoji
         mood_count[emoji] = mood_count.get(emoji, 0) + 1
+        entry_day = entry.timestamp.date()
+        unique_days.add(entry_day)
+        day_scores.setdefault(entry_day, []).append(MOOD_SCORES.get(emoji, 3))
     
     # Расчёт процентов
     mood_stats = {}
@@ -84,6 +195,33 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
     
     # Расчёт серии дней (streak)
     streak = calculate_streak(entries)
+
+    dominant_emoji, dominant_count = max(
+        mood_count.items(), key=lambda item: (item[1], MOOD_SCORES.get(item[0], 0))
+    )
+    dominant_mood = {
+        "emoji": dominant_emoji,
+        "count": dominant_count,
+        "percent": mood_stats[dominant_emoji]["percent"],
+    }
+
+    latest_entry = entries[0]
+    best_day = None
+    worst_day = None
+    if len(day_scores) > 1:
+        day_averages = {
+            day: sum(scores) / len(scores) for day, scores in day_scores.items()
+        }
+        best_day_date = max(day_averages, key=day_averages.get)
+        worst_day_date = min(day_averages, key=day_averages.get)
+        best_day = {
+            "date": best_day_date,
+            "score": round(day_averages[best_day_date], 1),
+        }
+        worst_day = {
+            "date": worst_day_date,
+            "score": round(day_averages[worst_day_date], 1),
+        }
     
     return {
         "total": total,
@@ -91,6 +229,12 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
         "avg_per_day": round(total / days_count, 1),
         "period": period,
         "streak": streak,
+        "active_days": len(unique_days),
+        "dominant_mood": dominant_mood,
+        "latest_entry": latest_entry,
+        "tracking_days": max((now.date() - period_start).days + 1, 1),
+        "best_day": best_day,
+        "worst_day": worst_day,
     }
 
 
@@ -98,13 +242,13 @@ def calculate_streak(entries) -> int:
     """Вычисляет текущую серию дней подряд с записями"""
     if not entries:
         return 0
-    
-    today = datetime.utcnow().date()
+
+    today = utc_now().date()
     dates = sorted(set(e.timestamp.date() for e in entries), reverse=True)
-    
+
     streak = 0
     expected_date = today
-    
+
     for date in dates:
         if date == expected_date:
             streak += 1
