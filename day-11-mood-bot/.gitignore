@@ -1,5 +1,36 @@
+# Environment variables
 .env
+
+# Database
 *.db
+mood.db
+mood_entries_export.*
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
 venv/
-.pytest_cache/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Exports
+exports/

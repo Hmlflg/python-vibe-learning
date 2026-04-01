@@ -3,12 +3,22 @@ from datetime import UTC, datetime, timedelta
 from database.models import MoodEntry
 from sqlalchemy.orm import Session
 
+MOOD_EMOJI_BY_KEY = {
+    "excellent": "😊",
+    "good": "🙂",
+    "normal": "😐",
+    "bad": "😔",
+    "awful": "😢",
+}
+
+MOOD_KEY_BY_EMOJI = {emoji: key for key, emoji in MOOD_EMOJI_BY_KEY.items()}
+
 MOOD_SCORES = {
-    "😊": 5,
-    "🙂": 4,
-    "😐": 3,
-    "😔": 2,
-    "😢": 1,
+    "excellent": 5,
+    "good": 4,
+    "normal": 3,
+    "bad": 2,
+    "awful": 1,
 }
 
 
@@ -17,17 +27,41 @@ def utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def normalize_mood_key(
+    mood_key: str | None = None, mood_emoji: str | None = None
+) -> str:
+    """Нормализует состояние в текстовый ключ."""
+    if mood_key:
+        return mood_key
+    if mood_emoji:
+        return MOOD_KEY_BY_EMOJI.get(mood_emoji, "normal")
+    return "normal"
+
+
+def get_entry_mood_key(entry: MoodEntry) -> str:
+    """Возвращает текстовый ключ состояния из записи с поддержкой legacy-данных."""
+    mood_key = getattr(entry, "mood_key", None)
+    mood_emoji = getattr(entry, "mood_emoji", None)
+    return normalize_mood_key(mood_key, mood_emoji)
+
+
+def get_mood_emoji(mood_key: str) -> str:
+    """Возвращает emoji для текстового ключа состояния."""
+    return MOOD_EMOJI_BY_KEY.get(mood_key, "😐")
+
+
 def add_mood_entry(
     db: Session,
     user_id: int,
-    mood_emoji: str,
+    mood_key: str,
     reason: str | None = None,
     comment: str | None = None,
 ):
     """Добавляет новую запись состояния."""
     entry = MoodEntry(
         user_id=user_id,
-        mood_emoji=mood_emoji,
+        mood_key=mood_key,
+        mood_emoji=get_mood_emoji(mood_key),
         reason=reason,
         comment=comment,
         timestamp=utc_now(),
@@ -96,12 +130,13 @@ def get_latest_entry_for_day(db: Session, user_id: int, target_date):
 def update_mood_entry(
     db: Session,
     entry: MoodEntry,
-    mood_emoji: str,
+    mood_key: str,
     reason: str | None = None,
     comment: str | None = None,
 ):
     """Обновляет существующую запись состояния."""
-    entry.mood_emoji = mood_emoji
+    entry.mood_key = mood_key
+    entry.mood_emoji = get_mood_emoji(mood_key)
     entry.reason = reason
     entry.comment = comment
     entry.timestamp = utc_now()
@@ -192,12 +227,12 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
     unique_days = set()
 
     for entry in entries:
-        emoji = entry.mood_emoji
-        mood_count[emoji] = mood_count.get(emoji, 0) + 1
+        mood_key = get_entry_mood_key(entry)
+        mood_count[mood_key] = mood_count.get(mood_key, 0) + 1
         reason = entry.reason or "none"
         reason_count[reason] = reason_count.get(reason, 0) + 1
 
-        score = MOOD_SCORES.get(emoji, 3)
+        score = MOOD_SCORES.get(mood_key, 3)
         if score <= 2:
             negative_reason_count[reason] = negative_reason_count.get(reason, 0) + 1
         elif score >= 4:
@@ -209,9 +244,9 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
 
     # Расчёт процентов
     mood_stats = {}
-    for emoji, count in mood_count.items():
+    for mood_key, count in mood_count.items():
         percent = round((count / total) * 100)
-        mood_stats[emoji] = {"count": count, "percent": percent}
+        mood_stats[mood_key] = {"count": count, "percent": percent}
 
     reason_stats = {}
     for reason, count in reason_count.items():
@@ -221,13 +256,13 @@ def get_mood_statistics(db: Session, user_id: int, period: str = "all"):
     # Расчёт серии дней (streak)
     streak = calculate_streak(entries)
 
-    dominant_emoji, dominant_count = max(
+    dominant_key, dominant_count = max(
         mood_count.items(), key=lambda item: (item[1], MOOD_SCORES.get(item[0], 0))
     )
     dominant_mood = {
-        "emoji": dominant_emoji,
+        "key": dominant_key,
         "count": dominant_count,
-        "percent": mood_stats[dominant_emoji]["percent"],
+        "percent": mood_stats[dominant_key]["percent"],
     }
 
     latest_entry = entries[0]

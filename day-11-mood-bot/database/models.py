@@ -19,7 +19,10 @@ class MoodEntry(Base):
         DateTime, default=datetime.utcnow, nullable=False
     )
 
-    # Основная оценка состояния через эмодзи
+    # Основной текстовый ключ состояния
+    mood_key: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # Устаревшее представление состояния через эмодзи, оставлено для совместимости
     mood_emoji: Mapped[str] = mapped_column(String(10), nullable=False)
 
     # Причина состояния

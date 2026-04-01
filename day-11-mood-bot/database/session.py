@@ -29,9 +29,30 @@ def ensure_schema():
         columns = {column["name"] for column in inspector.get_columns("mood_entries")}
 
         with engine.begin() as connection:
+            if "mood_key" not in columns:
+                connection.execute(
+                    text("ALTER TABLE mood_entries ADD COLUMN mood_key VARCHAR(20)")
+                )
             if "reason" not in columns:
                 connection.execute(
                     text("ALTER TABLE mood_entries ADD COLUMN reason VARCHAR(50)")
+                )
+            if "mood_key" in columns or "mood_key" not in columns:
+                connection.execute(
+                    text(
+                        """
+                        UPDATE mood_entries
+                        SET mood_key = CASE mood_emoji
+                            WHEN '😊' THEN 'excellent'
+                            WHEN '🙂' THEN 'good'
+                            WHEN '😐' THEN 'normal'
+                            WHEN '😔' THEN 'bad'
+                            WHEN '😢' THEN 'awful'
+                            ELSE mood_key
+                        END
+                        WHERE mood_key IS NULL OR mood_key = ''
+                        """
+                    )
                 )
     except OperationalError:
         # Если файл SQLite сейчас недоступен, не валим импорт приложения.

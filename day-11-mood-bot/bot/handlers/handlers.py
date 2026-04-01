@@ -16,10 +16,13 @@ from bot.states import MoodStates, StatsStates
 from database.repository import (
     MOOD_SCORES,
     add_mood_entry,
+    get_entry_mood_key,
     get_entries_for_month,
     get_latest_entry_for_day,
+    get_mood_emoji,
     get_mood_statistics,
     get_user_entries,
+    normalize_mood_key,
     update_mood_entry,
     utc_now,
 )
@@ -29,19 +32,19 @@ from sqlalchemy.exc import SQLAlchemyError
 router = Router()
 
 MOOD_NAMES = {
-    "😊": "Отлично",
-    "🙂": "Хорошо",
-    "😐": "Нормально",
-    "😔": "Плохо",
-    "😢": "Ужасно",
+    "excellent": "Отлично",
+    "good": "Хорошо",
+    "normal": "Нормально",
+    "bad": "Плохо",
+    "awful": "Ужасно",
 }
 
 DAY_MARKERS = {
-    "😊": "🟢",
-    "🙂": "🟢",
-    "😐": "🟡",
-    "😔": "🟠",
-    "😢": "🔴",
+    "excellent": "🟢",
+    "good": "🟢",
+    "normal": "🟡",
+    "bad": "🟠",
+    "awful": "🔴",
 }
 
 REASON_NAMES = {
@@ -217,10 +220,12 @@ def build_calendar_text(entries, year: int, month: int) -> str:
     def summarize_day(day_entries):
         scores = {}
         for day_entry in day_entries:
-            emoji = day_entry.mood_emoji
-            scores[emoji] = scores.get(emoji, 0) + MOOD_SCORES.get(emoji, 3)
-        best_emoji = max(scores, key=lambda emoji: (scores[emoji], MOOD_SCORES.get(emoji, 0)))
-        return best_emoji
+            mood_key = get_entry_mood_key(day_entry)
+            scores[mood_key] = scores.get(mood_key, 0) + MOOD_SCORES.get(mood_key, 3)
+        best_key = max(
+            scores, key=lambda mood_key: (scores[mood_key], MOOD_SCORES.get(mood_key, 0))
+        )
+        return best_key
 
     day_marker_by_day = {
         day_key: DAY_MARKERS.get(summarize_day(day_entries), "⚪")
@@ -291,9 +296,11 @@ def format_entry_summary(entry) -> str:
 
     comment = entry.comment.strip() if entry.comment else "без комментария"
     reason = REASON_NAMES.get(entry.reason, "без причины") if entry.reason else "без причины"
+    mood_key = get_entry_mood_key(entry)
+    mood_emoji = get_mood_emoji(mood_key)
     return (
         f"{entry.timestamp.strftime('%H:%M')} · "
-        f"{MOOD_NAMES.get(entry.mood_emoji, entry.mood_emoji)} {entry.mood_emoji}"
+        f"{MOOD_NAMES.get(mood_key, mood_key)} {mood_emoji}"
         f" · {reason}"
         f" · {comment}"
     )
@@ -305,7 +312,7 @@ def build_stats_insight(stats: dict, period: str) -> str:
     if not dominant:
         return "Пока рано делать выводы."
 
-    mood_label = MOOD_NAMES.get(dominant["emoji"]) or str(dominant["emoji"])
+    mood_label = MOOD_NAMES.get(dominant["key"]) or str(dominant["key"])
     mood_name = mood_label.lower()
     negative_reasons = stats.get("negative_reasons", [])
     positive_reasons = stats.get("positive_reasons", [])
@@ -354,7 +361,6 @@ def build_stats_text(stats: dict, period: str) -> str:
         text += f"🕒 Последняя запись: <b>{format_entry_summary(latest_entry)}</b>\n"
     else:
         text += f"📌 Всего записей: <b>{stats['total']}</b>\n"
-        text += f"📈 Среднее в день: <b>{stats['avg_per_day']}</b>\n"
         text += f"🗓 Активных дней: <b>{stats.get('active_days', 0)}</b>\n"
 
         streak = stats.get("streak", 0)
@@ -365,9 +371,10 @@ def build_stats_text(stats: dict, period: str) -> str:
             text += f"🧭 Дней с первой записи: <b>{stats.get('tracking_days', 0)}</b>\n"
 
     if dominant:
+        dominant_key = dominant["key"]
         text += (
-            f"🏆 Чаще всего: <b>{MOOD_NAMES.get(dominant['emoji'], dominant['emoji'])} "
-            f"{dominant['emoji']}</b> ({dominant['count']} раз, {dominant['percent']}%)\n"
+            f"🏆 Чаще всего: <b>{MOOD_NAMES.get(dominant_key, dominant_key)} "
+            f"{get_mood_emoji(dominant_key)}</b> ({dominant['count']} раз, {dominant['percent']}%)\n"
         )
 
     if period in {"month", "all"}:
@@ -405,8 +412,11 @@ def build_stats_text(stats: dict, period: str) -> str:
     sorted_moods = sorted(
         stats["moods"].items(), key=lambda x: x[1]["count"], reverse=True
     )
-    for emoji, data in sorted_moods:
-        text += f"{emoji} {make_bar(data['percent'])} <b>{data['count']}</b> ({data['percent']}%)\n"
+    for mood_key, data in sorted_moods:
+        text += (
+            f"{get_mood_emoji(mood_key)} {make_bar(data['percent'])} "
+            f"<b>{data['count']}</b> ({data['percent']}%)\n"
+        )
 
     text += f"\n💡 <b>Итог:</b> {build_stats_insight(stats, period)}"
     return text
@@ -427,12 +437,13 @@ def build_template_buttons(reason: str | None) -> list[tuple[str, str]]:
 
 
 async def show_comment_step(
-    message: Message, mood_emoji: str, reason: str | None, reason_label: str
+    message: Message, mood_key: str, reason: str | None, reason_label: str
 ) -> None:
     """Показывает шаг ввода комментария."""
     template_buttons = build_template_buttons(reason)
+    mood_emoji = get_mood_emoji(mood_key)
     await message.edit_text(
-        f"🎭 Выбрано состояние: <b>{MOOD_NAMES.get(mood_emoji, mood_emoji)}</b>\n"
+        f"🎭 Выбрано состояние: <b>{MOOD_NAMES.get(mood_key, mood_key)}</b> {mood_emoji}\n"
         f"📌 Причина: <b>{reason_label}</b>\n\n"
         "📝 Напиши комментарий к своему состоянию\n"
         "<i>Или выбери шаблон ниже, либо пропусти этот шаг.</i>",
@@ -483,12 +494,13 @@ async def process_mood_callback(callback: CallbackQuery, state: FSMContext):
         return
 
     mood_emoji = callback.data.split("_")[1]
+    mood_key = normalize_mood_key(mood_emoji=mood_emoji)
     message = get_accessible_message(callback.message)
 
-    await state.update_data(mood_emoji=mood_emoji)
+    await state.update_data(mood_key=mood_key)
     if message:
         await message.edit_text(
-            f"🎭 Выбрано состояние: <b>{MOOD_NAMES.get(mood_emoji, mood_emoji)}</b>\n\n"
+            f"🎭 Выбрано состояние: <b>{MOOD_NAMES.get(mood_key, mood_key)}</b> {mood_emoji}\n\n"
             "📌 Что больше всего повлияло на это состояние?\n"
             "<i>Выбери наиболее подходящую причину ниже.</i>",
             reply_markup=get_reason_inline_keyboard(),
@@ -508,13 +520,13 @@ async def process_reason_callback(callback: CallbackQuery, state: FSMContext):
     reason_key = callback.data.replace("reason_", "")
     reason_label = REASON_NAMES.get(reason_key, "Другое")
     data = await state.get_data()
-    mood_emoji = data.get("mood_emoji")
+    mood_key = data.get("mood_key")
 
     await state.update_data(reason=reason_key if reason_key != "none" else None)
     if message:
         await show_comment_step(
             message,
-            mood_emoji,
+            mood_key,
             None if reason_key == "none" else reason_key,
             reason_label,
         )
@@ -542,13 +554,14 @@ async def process_comment_template_callback(callback: CallbackQuery, state: FSMC
     await state.set_state(MoodStates.waiting_for_confirm)
 
     data = await state.get_data()
-    mood_emoji = data.get("mood_emoji")
+    mood_key = data.get("mood_key")
     reason = data.get("reason")
     reason_text = REASON_NAMES.get(reason, "Без причины") if reason else "Без причины"
+    mood_emoji = get_mood_emoji(mood_key)
 
     preview_text = (
         "📋 <b>Проверь данные перед сохранением:</b>\n\n"
-        f"🎭 Состояние: {MOOD_NAMES.get(mood_emoji, mood_emoji)} {mood_emoji}\n"
+        f"🎭 Состояние: {MOOD_NAMES.get(mood_key, mood_key)} {mood_emoji}\n"
         f"📌 Причина: {reason_text}\n"
         f"📝 Комментарий: {template_text}\n\n"
         "Всё верно?"
@@ -556,7 +569,7 @@ async def process_comment_template_callback(callback: CallbackQuery, state: FSMC
     if data.get("editing_entry_id"):
         preview_text = (
             "📋 <b>Проверь изменения перед сохранением:</b>\n\n"
-            f"🎭 Состояние: {MOOD_NAMES.get(mood_emoji, mood_emoji)} {mood_emoji}\n"
+            f"🎭 Состояние: {MOOD_NAMES.get(mood_key, mood_key)} {mood_emoji}\n"
             f"📌 Причина: {reason_text}\n"
             f"📝 Комментарий: {template_text}\n\n"
             "Обновить запись?"
@@ -575,18 +588,19 @@ async def process_comment(message: types.Message, state: FSMContext):
     comment = message.text.strip() if message.text else None
 
     data = await state.get_data()
-    mood_emoji = data.get("mood_emoji")
+    mood_key = data.get("mood_key")
     reason = data.get("reason")
     reason_text = REASON_NAMES.get(reason, "Без причины") if reason else "Без причины"
+    mood_emoji = get_mood_emoji(mood_key)
 
-    if not mood_emoji:
+    if not mood_key:
         await message.answer("❌ Ошибка: данные потеряны. Начни заново.")
         await state.clear()
         return
 
     preview_text = (
         "📋 <b>Проверь данные перед сохранением:</b>\n\n"
-        f"🎭 Состояние: {MOOD_NAMES.get(mood_emoji, mood_emoji)} {mood_emoji}\n"
+        f"🎭 Состояние: {MOOD_NAMES.get(mood_key, mood_key)} {mood_emoji}\n"
         f"📌 Причина: {reason_text}\n"
         f"📝 Комментарий: {comment if comment else '—'}\n\n"
         "Всё верно?"
@@ -594,7 +608,7 @@ async def process_comment(message: types.Message, state: FSMContext):
     if data.get("editing_entry_id"):
         preview_text = (
             "📋 <b>Проверь изменения перед сохранением:</b>\n\n"
-            f"🎭 Состояние: {MOOD_NAMES.get(mood_emoji, mood_emoji)} {mood_emoji}\n"
+            f"🎭 Состояние: {MOOD_NAMES.get(mood_key, mood_key)} {mood_emoji}\n"
             f"📌 Причина: {reason_text}\n"
             f"📝 Комментарий: {comment if comment else '—'}\n\n"
             "Обновить запись?"
@@ -615,18 +629,19 @@ async def skip_comment_callback(callback: CallbackQuery, state: FSMContext):
         return
 
     data = await state.get_data()
-    mood_emoji = data.get("mood_emoji")
+    mood_key = data.get("mood_key")
     reason = data.get("reason")
     reason_text = REASON_NAMES.get(reason, "Без причины") if reason else "Без причины"
+    mood_emoji = get_mood_emoji(mood_key)
 
-    if not mood_emoji:
+    if not mood_key:
         await callback.answer("❌ Ошибка: данные потеряны", show_alert=True)
         await state.clear()
         return
 
     preview_text = (
         "📋 <b>Проверь данные перед сохранением:</b>\n\n"
-        f"🎭 Состояние: {MOOD_NAMES.get(mood_emoji, mood_emoji)} {mood_emoji}\n"
+        f"🎭 Состояние: {MOOD_NAMES.get(mood_key, mood_key)} {mood_emoji}\n"
         f"📌 Причина: {reason_text}\n"
         "📝 Комментарий: —\n\n"
         "Всё верно?"
@@ -634,7 +649,7 @@ async def skip_comment_callback(callback: CallbackQuery, state: FSMContext):
     if data.get("editing_entry_id"):
         preview_text = (
             "📋 <b>Проверь изменения перед сохранением:</b>\n\n"
-            f"🎭 Состояние: {MOOD_NAMES.get(mood_emoji, mood_emoji)} {mood_emoji}\n"
+            f"🎭 Состояние: {MOOD_NAMES.get(mood_key, mood_key)} {mood_emoji}\n"
             f"📌 Причина: {reason_text}\n"
             "📝 Комментарий: —\n\n"
             "Обновить запись?"
@@ -659,12 +674,12 @@ async def confirm_save_callback(callback: CallbackQuery, state: FSMContext):
         return
 
     data = await state.get_data()
-    mood_emoji = data.get("mood_emoji")
+    mood_key = data.get("mood_key")
     reason = data.get("reason")
     comment = data.get("comment")
     editing_entry_id = data.get("editing_entry_id")
 
-    if not mood_emoji:
+    if not mood_key:
         await callback.answer("❌ Ошибка: данные потеряны", show_alert=True)
         await state.clear()
         return
@@ -686,7 +701,7 @@ async def confirm_save_callback(callback: CallbackQuery, state: FSMContext):
                 entry = update_mood_entry(
                     db=db,
                     entry=entry,
-                    mood_emoji=mood_emoji,
+                    mood_key=mood_key,
                     reason=reason,
                     comment=comment,
                 )
@@ -694,7 +709,7 @@ async def confirm_save_callback(callback: CallbackQuery, state: FSMContext):
                 entry = add_mood_entry(
                     db=db,
                     user_id=user_id,
-                    mood_emoji=mood_emoji,
+                    mood_key=mood_key,
                     reason=reason,
                     comment=comment,
                 )
@@ -710,7 +725,7 @@ async def confirm_save_callback(callback: CallbackQuery, state: FSMContext):
 
     await message.answer(
         f"{'✅ <b>Запись обновлена!</b>' if editing_entry_id else '✅ <b>Состояние сохранено!</b>'}\n\n"
-        f"🎭 {MOOD_NAMES.get(mood_emoji, mood_emoji)} {mood_emoji}\n"
+        f"🎭 {MOOD_NAMES.get(mood_key, mood_key)} {get_mood_emoji(mood_key)}\n"
         f"📌 Причина: {REASON_NAMES.get(reason, 'Без причины') if reason else 'Без причины'}\n"
         f"📝 Комментарий: {comment if comment else '—'}",
         reply_markup=get_main_keyboard(),
@@ -796,7 +811,8 @@ async def show_history(message: types.Message):
     text = "📅 <b>Твоя история состояний</b>\n\n"
 
     for entry in entries:
-        text += f"{entry.timestamp.strftime('%d.%m %H:%M')}  {entry.mood_emoji}  "
+        mood_key = get_entry_mood_key(entry)
+        text += f"{entry.timestamp.strftime('%d.%m %H:%M')}  {get_mood_emoji(mood_key)}  "
 
         comment = str(entry.comment).strip() if entry.comment is not None else ""
         if comment:
@@ -834,9 +850,10 @@ async def edit_today_entry(message: types.Message, state: FSMContext):
     await state.set_state(MoodStates.waiting_for_mood)
 
     current_comment = entry.comment.strip() if entry.comment else "—"
+    mood_key = get_entry_mood_key(entry)
     await message.answer(
         f"✏️ <b>Редактируем запись за сегодня</b>\n\n"
-        f"Сейчас: {MOOD_NAMES.get(entry.mood_emoji, entry.mood_emoji)} {entry.mood_emoji}\n"
+        f"Сейчас: {MOOD_NAMES.get(mood_key, mood_key)} {get_mood_emoji(mood_key)}\n"
         f"Причина: {REASON_NAMES.get(entry.reason, 'Без причины') if entry.reason else 'Без причины'}\n"
         f"Комментарий: {current_comment}\n\n"
         "Выбери новое состояние:",
