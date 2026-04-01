@@ -1,12 +1,18 @@
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, FSInputFile, Message
+from bot.exporters import (
+    create_csv_export_file,
+    create_html_report_file,
+    create_json_export_file,
+)
 from bot.keyboards.keyboards import (
     get_calendar_navigation_keyboard,
     get_cancel_inline_keyboard,
     get_comment_action_keyboard,
     get_confirm_keyboard,
+    get_export_keyboard,
     get_main_keyboard,
     get_mood_inline_keyboard,
     get_reason_inline_keyboard,
@@ -16,6 +22,7 @@ from bot.states import MoodStates, StatsStates
 from database.repository import (
     MOOD_SCORES,
     add_mood_entry,
+    get_all_user_entries,
     get_entry_mood_key,
     get_entries_for_month,
     get_latest_entry_for_day,
@@ -27,6 +34,7 @@ from database.repository import (
     utc_now,
 )
 from database.session import create_session
+from pathlib import Path
 from sqlalchemy.exc import SQLAlchemyError
 
 router = Router()
@@ -278,6 +286,7 @@ def build_help_text() -> str:
         "➕ <b>Записать состояние</b> — создать новую запись.\n"
         "📊 <b>Моя статистика</b> — сводка за сегодня, неделю, месяц и всё время.\n"
         "🗓 <b>Календарь</b> — месячный обзор с переключением по месяцам.\n\n"
+        "📤 <b>Экспорт</b> — отправить HTML-отчёт, CSV или JSON прямо в чат.\n\n"
         "Во время ввода комментария можно написать свой текст, выбрать шаблон или нажать <b>Пропустить</b>."
     )
 
@@ -462,6 +471,18 @@ async def show_calendar_message(
         text,
         reply_markup=get_calendar_navigation_keyboard(year, month),
     )
+
+
+async def send_export_file(
+    message: Message,
+    file_path: Path,
+    caption: str,
+) -> None:
+    """Отправляет файл пользователю и удаляет временный файл после отправки."""
+    try:
+        await message.answer_document(FSInputFile(file_path), caption=caption)
+    finally:
+        file_path.unlink(missing_ok=True)
 
 
 @router.message(Command("start"))
@@ -740,12 +761,12 @@ async def confirm_edit_callback(callback: CallbackQuery, state: FSMContext):
     await state.set_state(MoodStates.waiting_for_comment)
     message = get_accessible_message(callback.message)
     data = await state.get_data()
-    mood_emoji = data.get("mood_emoji")
+    mood_key = data.get("mood_key")
     reason = data.get("reason")
     if message:
         await show_comment_step(
             message,
-            mood_emoji,
+            mood_key,
             reason,
             REASON_NAMES.get(reason, "Без причины") if reason else "Без причины",
         )
@@ -844,13 +865,14 @@ async def edit_today_entry(message: types.Message, state: FSMContext):
         )
         return
 
+    mood_key = get_entry_mood_key(entry)
     await state.clear()
     await state.update_data(editing_entry_id=entry.id)
+    await state.update_data(mood_key=mood_key)
     await state.update_data(reason=entry.reason)
     await state.set_state(MoodStates.waiting_for_mood)
 
     current_comment = entry.comment.strip() if entry.comment else "—"
-    mood_key = get_entry_mood_key(entry)
     await message.answer(
         f"✏️ <b>Редактируем запись за сегодня</b>\n\n"
         f"Сейчас: {MOOD_NAMES.get(mood_key, mood_key)} {get_mood_emoji(mood_key)}\n"
@@ -941,6 +963,81 @@ async def process_calendar_navigation(callback: CallbackQuery):
         reply_markup=get_calendar_navigation_keyboard(year, month),
     )
     await callback.answer()
+
+
+@router.message(Command("export"))
+@router.message(F.text == "📤 Экспорт")
+async def show_export_menu(message: types.Message):
+    """Показывает варианты экспорта данных."""
+    if not message.from_user:
+        await message.answer("Ошибка: не удалось определить пользователя.")
+        return
+
+    await message.answer(
+        "📤 <b>Экспорт данных</b>\n\nВыбери удобный формат выгрузки:",
+        reply_markup=get_export_keyboard(),
+    )
+
+
+@router.callback_query(F.data.startswith("export_"))
+async def process_export_callback(callback: CallbackQuery):
+    """Генерирует экспорт и отправляет файл пользователю."""
+    message = get_accessible_message(callback.message)
+    if not callback.from_user or not callback.data or not message:
+        await callback.answer()
+        return
+
+    export_kind = callback.data.replace("export_", "")
+
+    with create_session() as db:
+        if export_kind == "html_month":
+            now = utc_now()
+            entries = get_entries_for_month(
+                db,
+                user_id=callback.from_user.id,
+                year=now.year,
+                month=now.month,
+            )
+            stats = get_mood_statistics(db, user_id=callback.from_user.id, period="month")
+            file_path = create_html_report_file(
+                title="Отчёт по состояниям",
+                period_label=f"Текущий месяц: {now.strftime('%m.%Y')}",
+                stats=stats,
+                entries=entries,
+                filename_prefix="mood_report_month_",
+            )
+            caption = "HTML-отчёт за текущий месяц"
+        elif export_kind == "html_all":
+            entries = get_all_user_entries(db, user_id=callback.from_user.id)
+            stats = get_mood_statistics(db, user_id=callback.from_user.id, period="all")
+            file_path = create_html_report_file(
+                title="Полный отчёт по состояниям",
+                period_label="Весь период наблюдений",
+                stats=stats,
+                entries=entries,
+                filename_prefix="mood_report_all_",
+            )
+            caption = "HTML-отчёт за всё время"
+        elif export_kind == "csv_all":
+            entries = get_all_user_entries(db, user_id=callback.from_user.id)
+            file_path = create_csv_export_file(
+                entries,
+                filename_prefix="mood_export_",
+            )
+            caption = "CSV-экспорт записей"
+        elif export_kind == "json_all":
+            entries = get_all_user_entries(db, user_id=callback.from_user.id)
+            file_path = create_json_export_file(
+                entries,
+                filename_prefix="mood_export_",
+            )
+            caption = "JSON-экспорт записей"
+        else:
+            await callback.answer("Неизвестный формат экспорта", show_alert=True)
+            return
+
+    await send_export_file(message, file_path, caption)
+    await callback.answer("Файл готов")
 
 
 @router.message(Command("help"))

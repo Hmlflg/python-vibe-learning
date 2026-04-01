@@ -87,6 +87,16 @@ def get_user_entries(db: Session, user_id: int, limit: int = 50):
     )
 
 
+def get_all_user_entries(db: Session, user_id: int):
+    """Получает все записи пользователя без ограничения."""
+    return (
+        db.query(MoodEntry)
+        .filter(MoodEntry.user_id == user_id)
+        .order_by(MoodEntry.timestamp.desc())
+        .all()
+    )
+
+
 def get_entries_by_period(db: Session, user_id: int, days: int = 30):
     """Получает записи за последние N дней"""
     start_date = utc_now() - timedelta(days=days)

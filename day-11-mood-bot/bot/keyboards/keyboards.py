@@ -12,7 +12,7 @@ def get_main_keyboard():
         [KeyboardButton(text="➕ Записать состояние")],
         [KeyboardButton(text="📊 Моя статистика")],
         [KeyboardButton(text="🗓 Календарь")],
-        [KeyboardButton(text="❓ Помощь")],
+        [KeyboardButton(text="📤 Экспорт"), KeyboardButton(text="❓ Помощь")],
     ]
     return ReplyKeyboardMarkup(
         keyboard=kb, resize_keyboard=True, input_field_placeholder="Выбери действие..."
@@ -158,5 +158,21 @@ def get_calendar_navigation_keyboard(year: int, month: int):
                 callback_data=f"calendar_month_{next_year}_{next_month:02d}",
             ),
         ]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def get_export_keyboard():
+    """Inline-клавиатура выбора формата экспорта."""
+    kb = [
+        [
+            InlineKeyboardButton(text="HTML за месяц", callback_data="export_html_month"),
+            InlineKeyboardButton(text="HTML за всё время", callback_data="export_html_all"),
+        ],
+        [
+            InlineKeyboardButton(text="CSV", callback_data="export_csv_all"),
+            InlineKeyboardButton(text="JSON", callback_data="export_json_all"),
+        ],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
