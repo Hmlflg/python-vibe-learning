@@ -1,18 +1,12 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-// Путь к файлу базы данных (в папке server)
 const DB_PATH = path.join(__dirname, '..', 'database.db');
-
-// Открываем (или создаём) базу данных
 const db = new Database(DB_PATH);
 
-// Включаем режим WAL для лучшей производительности
 db.pragma('journal_mode = WAL');
 
-// Создаём таблицы если их ещё нет
 db.exec(`
-  -- Таблица пользователей
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     login TEXT NOT NULL UNIQUE,
@@ -21,7 +15,6 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  -- Таблица предметов
   CREATE TABLE IF NOT EXISTS subjects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -29,7 +22,6 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  -- Таблица домашних заданий
   CREATE TABLE IF NOT EXISTS homeworks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -40,7 +32,6 @@ db.exec(`
     FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
   );
 
-  -- Таблица сообщений чата
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     text TEXT NOT NULL,
@@ -51,6 +42,17 @@ db.exec(`
   );
 `);
 
-console.log('✅ SQLite база данных готова');
+const userColumns = db.prepare('PRAGMA table_info(users)').all();
+const hasIsActivated = userColumns.some((column) => column.name === 'is_activated');
+
+if (!hasIsActivated) {
+  db.exec("ALTER TABLE users ADD COLUMN is_activated INTEGER NOT NULL DEFAULT 1");
+}
+
+db.prepare(
+  "UPDATE users SET is_activated = CASE WHEN password IS NULL OR password = '' THEN 0 ELSE 1 END WHERE is_activated IS NULL"
+).run();
+
+console.log('SQLite database is ready');
 
 module.exports = db;

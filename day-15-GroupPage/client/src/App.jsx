@@ -2,29 +2,22 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useNavigate } from 'react
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Subjects from './pages/Subjects';
-import Homework from './pages/Homework';
-import Chat from './pages/Chat';
+import Dashboard from './pages/Dashboard';
 
-// Компонент-обёртка: если не авторизован — редирект на /login
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
 
-  // Пока проверяем токен — показываем загрузку
   if (loading) {
     return <div style={{ padding: 20 }}>Загрузка...</div>;
   }
 
-  // Нет пользователя — на логин
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Авторизован — показываем страницу
   return children;
 }
 
-// Навигационная панель (показывается только авторизованным)
 function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -35,27 +28,36 @@ function Navbar() {
   };
 
   return (
-    <nav style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '10px 20px',
-      borderBottom: '1px solid #ddd',
-      background: '#fff',
-    }}>
-      <div style={{ display: 'flex', gap: 20 }}>
-        <Link to="/">Предметы</Link>
-        <Link to="/chat">Чат</Link>
-      </div>
+    <nav
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '14px 24px',
+        borderBottom: '1px solid #d8e0ea',
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(10px)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}
+    >
+      <Link
+        to="/"
+        style={{ fontWeight: 700, color: '#183b56', textDecoration: 'none' }}
+      >
+        Group Page
+      </Link>
       <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-        <span>👤 {user.login} {user.role === 'admin' && '(админ)'}</span>
+        <span style={{ color: '#486581' }}>
+          {user.login} {user.role === 'admin' && '(админ)'}
+        </span>
         <button onClick={handleLogout}>Выйти</button>
       </div>
     </nav>
   );
 }
 
-// Layout для авторизованных страниц
 function AppLayout({ children }) {
   return (
     <div>
@@ -68,43 +70,22 @@ function AppLayout({ children }) {
 function AppRoutes() {
   return (
     <Routes>
-      {/* Публичные маршруты */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* Защищённые маршруты */}
       <Route
         path="/"
         element={
           <ProtectedRoute>
             <AppLayout>
-              <Subjects />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/subjects/:id"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Homework />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/chat"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Chat />
+              <Dashboard />
             </AppLayout>
           </ProtectedRoute>
         }
       />
 
-      {/* Неизвестный URL — редирект на главную */}
+      <Route path="/subjects/:id" element={<Navigate to="/" replace />} />
+      <Route path="/chat" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
