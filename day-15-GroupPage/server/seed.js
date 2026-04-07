@@ -1,5 +1,6 @@
 // Скрипт для заполнения базы начальными данными
-// Запускать один раз: cd server && node seed.js
+// Запускать: cd server && npm run seed
+// Для полной очистки: cd server && npm run seed:reset
 
 require('dotenv').config();
 const db = require('./config/db');
@@ -12,9 +13,9 @@ async function seed() {
     const adminExists = db.prepare('SELECT id FROM users WHERE login = ?').get('admin');
     if (!adminExists) {
         const hashedPassword = await bcrypt.hash('admin123', 10);
-        db.prepare('INSERT INTO users (login, password, role) VALUES (?, ?, ?)').run(
-            'admin', hashedPassword, 'admin'
-        );
+        db.prepare(
+            'INSERT INTO users (login, password, role, is_activated) VALUES (?, ?, ?, ?)'
+        ).run('admin', hashedPassword, 'admin', 1);
         console.log('  ✅ Админ создан: login=admin, password=admin123');
     } else {
         console.log('  ⏭️  Админ уже есть');
@@ -38,7 +39,7 @@ async function seed() {
         }
         console.log(`  ✅ Добавлено ${subjectsData.length} предметов`);
 
-        // 3. Добавляем примеры ДЗ (используем реальные ID)
+        // 3. Добавляем примеры ДЗ
         const homeworks = [
             { title: 'Интегралы', description: 'Решить задачи 1-15 из задачника', dueDate: '2026-04-20', subjectId: subjectIds[0] },
             { title: 'Матрицы', description: 'Найти определитель матрицы 3x3', dueDate: '2026-04-25', subjectId: subjectIds[0] },

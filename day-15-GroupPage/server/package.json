@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "seed:reset": "del database.db && node seed.js"
   },
   "keywords": [],
   "author": "",
