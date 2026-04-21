@@ -1,0 +1,8 @@
+Starting project at D:\Learning\Python\Projects\python-vibe-2026\python-vibe-learning\Thinkie
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android .\index.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 56.4% (341/454)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (706/706)
+Android Bundled 7223ms index.js (706 modules)
