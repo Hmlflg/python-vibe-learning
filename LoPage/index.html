@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>для тебя</title>
+  <style>
+    :root {
+      --bg-1: #0c0a1a;
+      --bg-2: #16133a;
+      --bg-3: #211c45;
+      --pink: #e8a8c4;
+      --rose: #f2c4d8;
+      --lavender: #c9a0d8;
+      --accent: #ffafcc;
+      --text: #f4e6f0;
+      --crack: #e8d1e0;
+      --progress: 0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: "Georgia", "Times New Roman", serif;
+      background: #0c0a1a;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    .app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(145deg, var(--bg-1) 0%, var(--bg-2) 45%, var(--bg-3) 100%);
+      transition: background 1.2s ease;
+    }
+
+    /* Subtle warm red overlay that intensifies with progress */
+    .app::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        circle at 50% 48%,
+        rgba(180, 55, 55, calc(0.04 + var(--progress) * 0.07)) 0%,
+        rgba(140, 35, 35, calc(0.025 + var(--progress) * 0.04)) 46%,
+        transparent 72%
+      );
+      pointer-events: none;
+      z-index: 1;
+      transition: background 1.1s ease;
+    }
+
+    #particles {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.85;
+      mix-blend-mode: screen;
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        circle at center,
+        transparent 58%,
+        rgba(12, 10, 26, 0.55) 82%,
+        rgba(12, 10, 26, 0.85) 100%
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .content {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 38px;
+    }
+
+    .heart-stage {
+      position: relative;
+      width: min(68vmin, 520px);
+      height: min(68vmin, 520px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Delicate soft ring around the heart for focus */
+    .heart-stage::after {
+      content: '';
+      position: absolute;
+      inset: -12%;
+      border-radius: 50%;
+      background: radial-gradient(
+        circle at 50% 47%,
+        transparent 61%,
+        rgba(232, 168, 196, 0.035) 72%,
+        transparent 78%
+      );
+      pointer-events: none;
+      z-index: 1;
+      transition: opacity 1s ease;
+      opacity: 0.75;
+    }
+
+    .complete .heart-stage::after {
+      opacity: 0.35;
+    }
+
+    #heart-svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 24px rgba(180, 60, 60, 0.32))
+              drop-shadow(0 0 52px rgba(140, 40, 40, 0.18));
+      transition: filter 0.8s ease, transform 0.8s ease;
+      cursor: default;
+    }
+
+    /* Breathing animation for the whole heart initially */
+    .breathing {
+      animation: breathe 4.6s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.015); }
+    }
+
+    .piece {
+      cursor: pointer;
+      transition: transform 820ms cubic-bezier(0.23, 1.0, 0.32, 1),
+                  filter 380ms ease;
+      transform-origin: 100px 104px;
+    }
+
+    .piece:hover {
+      filter: brightness(1.18) saturate(1.08);
+    }
+
+    /* Real physical shard look when broken */
+    .shard {
+      transition: filter 280ms ease;
+      filter: drop-shadow(0 1.5px 3px rgba(0, 0, 0, 0.25));
+    }
+
+    .piece.fixed .shard {
+      filter: drop-shadow(0 0.5px 1.5px rgba(0, 0, 0, 0.15));
+    }
+
+    .shard-highlight {
+      pointer-events: none;
+    }
+
+    .piece.fixed {
+      transition: transform 820ms cubic-bezier(0.2, 0.95, 0.3, 1),
+                  filter 360ms ease;
+    }
+
+    .piece.fixed:hover {
+      filter: brightness(1.05);
+    }
+
+    .crack {
+      stroke: #f4d9c9;
+      stroke-width: 2.25;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.82;
+      transition: opacity 680ms cubic-bezier(0.23, 1, 0.3, 1), stroke 420ms ease;
+      filter: drop-shadow(0 0 1.5px rgba(244, 217, 201, 0.35));
+    }
+
+    .complete #heart-svg {
+      animation: heartbeat 1.85s ease-in-out infinite;
+      filter: drop-shadow(0 0 28px rgba(200, 75, 75, 0.55))
+              drop-shadow(0 0 68px rgba(160, 45, 45, 0.35));
+    }
+
+    @keyframes heartbeat {
+      0%, 100% { transform: scale(1); }
+      12% { transform: scale(1.065); }
+      24% { transform: scale(1); }
+      38% { transform: scale(1.035); }
+      52% { transform: scale(1); }
+    }
+
+    .instruction {
+      font-size: clamp(15px, 3.6vmin, 21px);
+      letter-spacing: 3.2px;
+      color: rgba(244, 230, 230, 0.65);
+      text-transform: lowercase;
+      user-select: none;
+      transition: opacity 420ms ease, transform 420ms ease;
+      text-shadow: 0 1px 12px rgba(12, 10, 26, 0.6);
+    }
+
+    .instruction.hidden {
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+    }
+
+    .final-message {
+      position: absolute;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      opacity: 0;
+      transform: translateY(14px) scale(0.985);
+      pointer-events: none;
+      transition: opacity 820ms cubic-bezier(0.23, 1, 0.32, 1),
+                  transform 920ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .final-message.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    .final-text {
+      font-size: clamp(42px, 11.5vmin, 84px);
+      letter-spacing: 5.2px;
+      color: #f4e6e6;
+      text-shadow: 
+        0 0 16px rgba(200, 75, 75, 0.65),
+        0 0 36px rgba(160, 45, 45, 0.45),
+        0 3px 14px rgba(12, 10, 26, 0.5);
+      user-select: none;
+      white-space: nowrap;
+      animation: final-pulse 3.8s ease-in-out infinite;
+      animation-delay: 1.6s;
+    }
+
+    @keyframes final-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.86; }
+    }
+
+    .final-hint {
+      font-size: clamp(12px, 2.8vmin, 15px);
+      letter-spacing: 2.8px;
+      color: rgba(244, 230, 230, 0.45);
+      text-transform: lowercase;
+      user-select: none;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 28px;
+      right: 28px;
+      display: flex;
+      gap: 10px;
+      z-index: 20;
+    }
+
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(244, 230, 240, 0.055);
+      color: rgba(244, 230, 240, 0.75);
+      font-size: 17px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 280ms ease;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(244, 230, 240, 0.08);
+    }
+
+    .icon-btn:hover {
+      background: rgba(244, 230, 240, 0.1);
+      color: #f4e6f0;
+      transform: scale(1.05);
+    }
+
+    .icon-btn:active {
+      transform: scale(0.94);
+    }
+
+    .icon-btn.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.6);
+    }
+
+    .burst {
+      position: absolute;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 620px) {
+      .content {
+        gap: 26px;
+      }
+      .controls {
+        bottom: 18px;
+        right: 18px;
+      }
+      .icon-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 15px;
+      }
+    }
+
+    /* Very small screens */
+    @media (max-height: 620px) {
+      .content {
+        gap: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <canvas id="particles"></canvas>
+    <div class="vignette"></div>
+
+    <div class="content">
+      <div class="heart-stage">
+        <svg id="heart-svg" viewBox="0 0 200 200" class="breathing" aria-label="Разбитое сердце">
+          <defs>
+            <!-- BRAND NEW HEART - completely different shape from scratch -->
+            <path id="heart-shape" d="M100 182 
+              Q 16 102 20 52 
+              Q 22 14 68 14 
+              Q 100 14 100 46 
+              Q 100 14 132 14 
+              Q 178 14 180 52 
+              Q 184 102 100 182 Z" />
+
+            <!-- Inner highlight -->
+            <path id="heart-highlight" d="M100 172 
+              Q 28 100 32 56 
+              Q 34 24 70 24 
+              Q 100 24 100 50 
+              Q 100 24 130 24 
+              Q 166 24 168 56 
+              Q 172 100 100 172 Z" />
+
+            <!-- Fresh red gradient -->
+            <linearGradient id="heart-grad" x1="30" y1="20" x2="170" y2="165" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#d65d5d" />
+              <stop offset="35%" stop-color="#b03a3a" />
+              <stop offset="100%" stop-color="#6e1a1a" />
+            </linearGradient>
+
+            <!-- New highlight -->
+            <radialGradient id="inner-glow" cx="48%" cy="32%" r="66%" fx="45%" fy="26%">
+              <stop offset="0%" stop-color="#f9c2b4" stop-opacity="0.9" />
+              <stop offset="40%" stop-color="#e57d6f" stop-opacity="0.58" />
+              <stop offset="100%" stop-color="#b03a3a" stop-opacity="0.05" />
+            </radialGradient>
+
+            <!-- Glow -->
+            <filter id="soft-glow" x="-250%" y="-250%" width="600%" height="600%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="7.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <!-- Outer glow -->
+          <g filter="url(#soft-glow)">
+            <use href="#heart-shape" fill="#b03a3a" opacity="0.25" />
+          </g>
+
+          <!-- THE COMPLETE WHOLE HEART -->
+          <g id="base-heart" opacity="0.97">
+            <use href="#heart-shape" fill="url(#heart-grad)" />
+            <use href="#heart-highlight" fill="url(#inner-glow)" opacity="0.6" />
+          </g>
+
+          <!-- New fracture lines -->
+          <g id="cracks" opacity="0.76">
+            <path class="crack" d="M49 44 Q 67 66 63 94" />
+            <path class="crack" d="M151 44 Q 133 66 137 94" />
+            <path class="crack" d="M95 38 Q 100 66 99 95" />
+            <path class="crack" d="M56 78 Q 78 102 73 132" />
+            <path class="crack" d="M144 78 Q 122 102 127 132" />
+            <path class="crack" d="M71 134 Q 100 146 129 134" />
+            <path class="crack" d="M84 152 Q 100 160 116 152" />
+          </g>
+
+          <!-- 7 BRAND NEW SHARDS -->
+
+          <!-- 1. Left upper lobe -->
+          <g id="piece-1" class="piece" data-id="1" transform="translate(-8,-7) rotate(-5.5 100 105)">
+            <path class="shard" d="M20,52 Q22,14 68,14 Q93,14 98,42 Q78,68 48,64 Q34,60 20,52 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M20,52 Q22,14 68,14 Q93,14 98,42 Q78,68 48,64 Q34,60 20,52 Z" fill="url(#inner-glow)" opacity="0.62" />
+          </g>
+
+          <!-- 2. Right upper lobe -->
+          <g id="piece-2" class="piece" data-id="2" transform="translate(8,-7) rotate(5.5 100 105)">
+            <path class="shard" d="M180,52 Q178,14 132,14 Q107,14 102,42 Q122,68 152,64 Q166,60 180,52 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M180,52 Q178,14 132,14 Q107,14 102,42 Q122,68 152,64 Q166,60 180,52 Z" fill="url(#inner-glow)" opacity="0.62" />
+          </g>
+
+          <!-- 3. Center top -->
+          <g id="piece-3" class="piece" data-id="3" transform="translate(-3.5,2) rotate(-2 100 105)">
+            <path class="shard" d="M48,64 Q34,60 20,52 Q25,88 56,84 Q75,72 78,68 Q62,72 48,64 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M48,64 Q34,60 20,52 Q25,88 56,84 Q75,72 78,68 Q62,72 48,64 Z" fill="url(#inner-glow)" opacity="0.55" />
+          </g>
+
+          <!-- 4. Left middle -->
+          <g id="piece-4" class="piece" data-id="4" transform="translate(-6,6) rotate(-2.8 100 105)">
+            <path class="shard" d="M56,84 Q75,72 78,68 Q96,108 88,140 Q62,128 56,84 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M56,84 Q75,72 78,68 Q96,108 88,140 Q62,128 56,84 Z" fill="url(#inner-glow)" opacity="0.52" />
+          </g>
+
+          <!-- 5. Right middle -->
+          <g id="piece-5" class="piece" data-id="5" transform="translate(6,6) rotate(2.8 100 105)">
+            <path class="shard" d="M144,84 Q125,72 122,68 Q104,108 112,140 Q138,128 144,84 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M144,84 Q125,72 122,68 Q104,108 112,140 Q138,128 144,84 Z" fill="url(#inner-glow)" opacity="0.52" />
+          </g>
+
+          <!-- 6. Left bottom -->
+          <g id="piece-6" class="piece" data-id="6" transform="translate(-4.5,10) rotate(-1.4 100 105)">
+            <path class="shard" d="M62,128 Q88,140 100,172 Q76,158 62,128 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M62,128 Q88,140 100,172 Q76,158 62,128 Z" fill="url(#inner-glow)" opacity="0.5" />
+          </g>
+
+          <!-- 7. Right bottom + tip -->
+          <g id="piece-7" class="piece" data-id="7" transform="translate(4.5,11) rotate(1.6 100 105)">
+            <path class="shard" d="M100,172 Q112,140 138,128 Q124,158 100,172 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M100,172 Q112,140 138,128 Q124,158 100,172 Z" fill="url(#inner-glow)" opacity="0.48" />
+          </g>
+        </svg>
+          <defs>
+            <!-- BRAND NEW HEART - completely different shape -->
+            <path id="heart-shape" d="M100 182 
+              Q 16 102 20 52 
+              Q 22 14 68 14 
+              Q 100 14 100 46 
+              Q 100 14 132 14 
+              Q 178 14 180 52 
+              Q 184 102 100 182 Z" />
+
+            <!-- Inner highlight for new heart -->
+            <path id="heart-highlight" d="M100 172 
+              Q 28 100 32 56 
+              Q 34 24 70 24 
+              Q 100 24 100 50 
+              Q 100 24 130 24 
+              Q 166 24 168 56 
+              Q 172 100 100 172 Z" />
+
+            <!-- Fresh red gradient -->
+            <linearGradient id="heart-grad" x1="30" y1="20" x2="170" y2="165" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#d65d5d" />
+              <stop offset="35%" stop-color="#b03a3a" />
+              <stop offset="100%" stop-color="#6e1a1a" />
+            </linearGradient>
+
+            <!-- New highlight -->
+            <radialGradient id="inner-glow" cx="48%" cy="32%" r="66%" fx="45%" fy="26%">
+              <stop offset="0%" stop-color="#f9c2b4" stop-opacity="0.9" />
+              <stop offset="40%" stop-color="#e57d6f" stop-opacity="0.58" />
+              <stop offset="100%" stop-color="#b03a3a" stop-opacity="0.05" />
+            </radialGradient>
+
+            <!-- Glow -->
+            <filter id="soft-glow" x="-250%" y="-250%" width="600%" height="600%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="7.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <!-- Outer romantic red glow -->
+          <g filter="url(#soft-glow)">
+            <use href="#heart-shape" fill="#b53a3a" opacity="0.24" />
+          </g>
+
+          <!-- THE WHOLE INTACT HEART (the one we are reassembling) -->
+          <g id="base-heart" opacity="0.96">
+            <use href="#heart-shape" fill="url(#heart-grad)" />
+            <use href="#heart-highlight" fill="url(#inner-glow)" opacity="0.62" />
+          </g>
+
+          <!-- Beautiful natural fracture lines on the whole heart -->
+          <g id="cracks" opacity="0.78">
+            <!-- Between left lobe and center -->
+            <path class="crack" d="M51 49 Q 66 68 62 92" />
+            <!-- Between right lobe and center -->
+            <path class="crack" d="M149 49 Q 134 68 138 92" />
+            <!-- Delicate vertical cleft in the middle -->
+            <path class="crack" d="M96 42 Q 100 68 99 93" />
+            <!-- Left organic break -->
+            <path class="crack" d="M58 80 Q 78 100 74 128" />
+            <!-- Right organic break -->
+            <path class="crack" d="M142 80 Q 122 100 126 128" />
+            <!-- Lower crossing fracture -->
+            <path class="crack" d="M73 132 Q 100 142 127 132" />
+            <!-- Fine tip crack -->
+            <path class="crack" d="M85 149 Q 100 156 115 149" />
+          </g>
+
+          <!-- ========== 7 NEW ELEGANT SHARDS (designed for the new heart) ========== -->
+
+          <!-- 1. Left top lobe (large & graceful) -->
+          <g id="piece-1" class="piece" data-id="1" transform="translate(-7.5,-6) rotate(-4.8 100 104)">
+            <path class="shard" d="M26,63 Q28,26 63,26 Q88,26 95,47 Q78,76 52,72 Q38,69 26,63 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M26,63 Q28,26 63,26 Q88,26 95,47 Q78,76 52,72 Q38,69 26,63 Z" fill="url(#inner-glow)" opacity="0.64" />
+          </g>
+
+          <!-- 2. Right top lobe -->
+          <g id="piece-2" class="piece" data-id="2" transform="translate(7.5,-6) rotate(4.8 100 104)">
+            <path class="shard" d="M174,63 Q172,26 137,26 Q112,26 105,47 Q122,76 148,72 Q162,69 174,63 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M174,63 Q172,26 137,26 Q112,26 105,47 Q122,76 148,72 Q162,69 174,63 Z" fill="url(#inner-glow)" opacity="0.64" />
+          </g>
+
+          <!-- 3. Delicate center piece between the lobes -->
+          <g id="piece-3" class="piece" data-id="3" transform="translate(-4,1) rotate(-1.8 100 104)">
+            <path class="shard" d="M52,72 Q38,69 26,63 Q29,98 58,95 Q76,82 78,76 Q65,79 52,72 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M52,72 Q38,69 26,63 Q29,98 58,95 Q76,82 78,76 Q65,79 52,72 Z" fill="url(#inner-glow)" opacity="0.58" />
+          </g>
+
+          <!-- 4. Left mid body (extends lower) -->
+          <g id="piece-4" class="piece" data-id="4" transform="translate(-5,5) rotate(-2.4 100 104)">
+            <path class="shard" d="M58,95 Q76,82 78,76 Q94,115 88,148 Q64,138 58,95 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M58,95 Q76,82 78,76 Q94,115 88,148 Q64,138 58,95 Z" fill="url(#inner-glow)" opacity="0.55" />
+          </g>
+
+          <!-- 5. Right mid body (extends lower) -->
+          <g id="piece-5" class="piece" data-id="5" transform="translate(5,5) rotate(2.4 100 104)">
+            <path class="shard" d="M142,95 Q124,82 122,76 Q106,115 112,148 Q136,138 142,95 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M142,95 Q124,82 122,76 Q106,115 112,148 Q136,138 142,95 Z" fill="url(#inner-glow)" opacity="0.55" />
+          </g>
+
+          <!-- 6. Left bottom flowing into tip -->
+          <g id="piece-6" class="piece" data-id="6" transform="translate(-4,9.5) rotate(-1.6 100 104)">
+            <path class="shard" d="M64,138 Q88,148 100,167 Q79,155 64,138 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M64,138 Q88,148 100,167 Q79,155 64,138 Z" fill="url(#inner-glow)" opacity="0.52" />
+          </g>
+
+          <!-- 7. Right bottom + the pointed tip -->
+          <g id="piece-7" class="piece" data-id="7" transform="translate(4,10.5) rotate(1.8 100 104)">
+            <path class="shard" d="M100,167 Q112,148 136,138 Q121,155 100,167 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M100,167 Q112,148 136,138 Q121,155 100,167 Z" fill="url(#inner-glow)" opacity="0.5" />
+          </g>
+
+
+
+          <!-- Shard 3: Left middle -->
+          <g id="piece-3" class="piece" data-id="3" transform="translate(-5.5,3) rotate(-2.6 100 104)">
+            <path class="shard" d="M55,75 Q42,73 32,72 Q35,108 62,105 Q78,92 77,78 Q64,80 55,75 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M55,75 Q42,73 32,72 Q35,108 62,105 Q78,92 77,78 Q64,80 55,75 Z" fill="url(#inner-glow)" opacity="0.6" />
+          </g>
+
+          <!-- Shard 4: Right middle -->
+          <g id="piece-4" class="piece" data-id="4" transform="translate(5.5,3) rotate(2.6 100 104)">
+            <path class="shard" d="M145,75 Q158,73 168,72 Q165,108 138,105 Q122,92 123,78 Q136,80 145,75 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M145,75 Q158,73 168,72 Q165,108 138,105 Q122,92 123,78 Q136,80 145,75 Z" fill="url(#inner-glow)" opacity="0.6" />
+          </g>
+
+          <!-- Shard 5: Left lower body -->
+          <g id="piece-5" class="piece" data-id="5" transform="translate(-4,7.5) rotate(-1.5 100 104)">
+            <path class="shard" d="M62,105 Q78,92 77,78 Q90,118 82,145 Q60,132 62,105 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M62,105 Q78,92 77,78 Q90,118 82,145 Q60,132 62,105 Z" fill="url(#inner-glow)" opacity="0.58" />
+          </g>
+
+          <!-- Shard 6: Right lower body -->
+          <g id="piece-6" class="piece" data-id="6" transform="translate(4,7.5) rotate(1.5 100 104)">
+            <path class="shard" d="M138,105 Q122,92 123,78 Q110,118 118,145 Q140,132 138,105 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M138,105 Q122,92 123,78 Q110,118 118,145 Q140,132 138,105 Z" fill="url(#inner-glow)" opacity="0.58" />
+          </g>
+
+          <!-- Shard 7: Bottom tip -->
+          <g id="piece-7" class="piece" data-id="7" transform="translate(0,10) rotate(0.3 100 104)">
+            <path class="shard" d="M82,145 Q60,132 62,105 Q100,163 118,145 Q140,132 138,105 Q110,118 100,163 Q90,118 82,145 Z" fill="url(#heart-grad)" />
+            <path class="shard-highlight" d="M82,145 Q60,132 62,105 Q100,163 118,145 Q140,132 138,105 Q110,118 100,163 Q90,118 82,145 Z" fill="url(#inner-glow)" opacity="0.52" />
+          </g>
+        </svg>
+      </div>
+
+      <p class="instruction" id="instruction">почини его</p>
+    </div>
+
+    <!-- Final message -->
+    <div class="final-message" id="final-message">
+      <div class="final-text">люблю тебя</div>
+      <div class="final-hint">нажми на сердце, чтобы повторить</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button id="sound-btn" class="icon-btn" aria-label="Включить или выключить звук" title="Звук">
+        <span id="sound-icon">♪</span>
+      </button>
+      <button id="restart-btn" class="icon-btn hidden" aria-label="Начать заново" title="Повторить">
+        ⟳
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // ==================== CONFIG ====================
+    const TOTAL_PIECES = 7;
+    let fixedPieces = new Set();
+    let audioContext = null;
+    let soundEnabled = true;
+    let isComplete = false;
+
+    // ==================== PARTICLES ====================
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d', { alpha: true });
+    let particles = [];
+    let particleCountBase = 38;
+    let progress = 0;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    class Particle {
+      constructor(x, y, isBurst = false) {
+        this.x = x ?? Math.random() * canvas.width;
+        this.y = y ?? Math.random() * canvas.height * 0.82 + 40;
+        this.size = Math.random() * 2.6 + (isBurst ? 1.8 : 1.4);
+        this.alpha = Math.random() * 0.55 + (isBurst ? 0.65 : 0.35);
+        this.vx = (Math.random() - 0.5) * (isBurst ? 1.35 : 0.38);
+        this.vy = (Math.random() - 0.5) * (isBurst ? 1.15 : 0.24) - (isBurst ? 0.1 : 0.12);
+        this.life = isBurst ? 58 + Math.random() * 32 : Infinity;
+        this.isHeart = Math.random() < (isBurst ? 0.55 : 0.12);
+        this.angle = Math.random() * Math.PI * 2;
+        this.spin = (Math.random() - 0.5) * 0.018;
+        this.hueShift = Math.random() * 12 - 6;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Very gentle drift + breathing movement
+        this.vx += Math.sin(this.angle) * 0.0028;
+        this.vy += Math.cos(this.angle * 0.7) * 0.0016;
+        this.angle += this.spin;
+
+        // Soft friction / return
+        this.vx *= 0.986;
+        this.vy *= 0.985;
+
+        // Slow upward bias
+        if (this.vy > -0.19) this.vy -= 0.0018;
+
+        // Gentle wrap around edges with fade
+        const pad = 50;
+        if (this.x < -pad) this.x = canvas.width + pad;
+        if (this.x > canvas.width + pad) this.x = -pad;
+        if (this.y < -pad) this.y = canvas.height + pad * 0.6;
+        if (this.y > canvas.height + 20) this.y = -pad * 0.4;
+
+        // Subtle alpha breathing
+        if (this.life !== Infinity) {
+          this.life--;
+          this.alpha = Math.max(0.02, this.alpha * 0.978);
+        } else {
+          this.alpha = 0.32 + Math.sin(Date.now() / 1450 + this.x * 0.004) * 0.18;
+        }
+
+        // Progress makes particles slightly warmer and more lively (capped)
+        if (progress > 0.3) {
+          const factor = 1 + Math.min(progress, 0.95) * 0.0009;
+          this.vx *= factor;
+          this.vy *= factor;
+        }
+      }
+
+      draw() {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.03, this.alpha * (0.75 + progress * 0.45));
+
+        if (this.isHeart) {
+          // Tiny floating heart
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.angle * 0.6);
+          ctx.scale(this.size * 0.65, this.size * 0.65);
+
+          ctx.fillStyle = `hsl(355, 72%, ${82 + this.hueShift}%)`;
+          ctx.beginPath();
+          ctx.moveTo(0, 0.6);
+          ctx.bezierCurveTo(-1.8, -1.6, -4.1, 0.9, 0, 3.6);
+          ctx.bezierCurveTo(4.1, 0.9, 1.8, -1.6, 0, 0.6);
+          ctx.fill();
+        } else {
+          // Soft glowing dot
+          const r = this.size;
+          const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r * 2.6);
+          grad.addColorStop(0, `hsla(355, 78%, 86%, 0.95)`);
+          grad.addColorStop(0.6, `hsla(355, 68%, 76%, 0.42)`);
+          grad.addColorStop(1, 'transparent');
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, r * 2.6, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = `hsla(355, 72%, 90%, 0.92)`;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    function initParticles() {
+      particles = [];
+      const count = Math.floor(particleCountBase * (window.innerWidth < 720 ? 0.72 : 1));
+      for (let i = 0; i < count; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function spawnBurst(x, y, count = 11) {
+      for (let i = 0; i < count; i++) {
+        const p = new Particle(x, y, true);
+        // Outward velocity
+        const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
+        const speed = 1.6 + Math.random() * 2.1;
+        p.vx = Math.cos(angle) * speed;
+        p.vy = Math.sin(angle) * speed - 0.6;
+        particles.push(p);
+      }
+    }
+
+    function updateAndDrawParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Occasionally add very slow ambient particles when progress is high
+      if (progress > 0.6 && particles.length < particleCountBase + 18 && Math.random() < 0.42) {
+        particles.push(new Particle());
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.update();
+        p.draw();
+
+        if (p.life !== Infinity && p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+
+      // Keep total particles reasonable
+      const max = particleCountBase + Math.floor(progress * 22);
+      if (particles.length > max) {
+        particles.splice(0, particles.length - max);
+      }
+    }
+
+    let particleAnimId;
+    function startParticleLoop() {
+      function loop() {
+        updateAndDrawParticles();
+        particleAnimId = requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    // ==================== AUDIO (soft chimes) ====================
+    function getAudioContext() {
+      if (!audioContext) {
+        try {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+          soundEnabled = false;
+        }
+      }
+      return audioContext;
+    }
+
+    function playSoftChime(pieceId) {
+      if (!soundEnabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+
+      // Soft bell-like tones — different for each piece
+      const baseNotes = [523.25, 587.33, 659.25, 698.46, 783.99, 830.61, 932.33]; // C5 to A#5-ish
+      const freq = baseNotes[(pieceId - 1) % baseNotes.length];
+
+      // Main tone — triangle for soft music-box feel
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+
+      // Gentle detune layer
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.value = freq * 1.995;
+
+      // Low-pass filter for warmth
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 1650 + Math.random() * 240;
+
+      // Envelope
+      const gain = ctx.createGain();
+      const gain2 = ctx.createGain();
+
+      // Very soft volume
+      const vol = 0.032 + (progress * 0.014);
+      gain.gain.value = vol;
+      gain2.gain.value = vol * 0.38;
+
+      // Very soft attack + long release
+      const attack = 0.018;
+      const decay = 1.25 + Math.random() * 0.6;
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(vol, now + attack);
+      gain.gain.linearRampToValueAtTime(0.0001, now + decay);
+
+      gain2.gain.setValueAtTime(0.0001, now);
+      gain2.gain.linearRampToValueAtTime(vol * 0.38, now + attack * 1.6);
+      gain2.gain.linearRampToValueAtTime(0.0001, now + decay * 0.95);
+
+      // Subtle reverb-ish using delay
+      const delay = ctx.createDelay(0.8);
+      delay.delayTime.value = 0.31;
+      const delayGain = ctx.createGain();
+      delayGain.gain.value = 0.16;
+
+      // Connect graph
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 0.9;
+
+      osc.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain);
+      filter.connect(gain2);
+
+      gain.connect(delay);
+      delay.connect(delayGain);
+      delayGain.connect(masterGain);
+
+      gain2.connect(masterGain);
+      masterGain.connect(ctx.destination);
+
+      osc.start(now);
+      osc2.start(now);
+
+      // Stop after decay
+      osc.stop(now + decay + 0.4);
+      osc2.stop(now + decay + 0.4);
+    }
+
+    function playFinalChime() {
+      if (!soundEnabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+
+      // Beautiful soft major chord spread over time
+      const chord = [523.25, 659.25, 783.99, 1046.5];
+
+      chord.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
+        osc.frequency.value = freq;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 2100;
+
+        const gain = ctx.createGain();
+        const vol = 0.028;
+        const startTime = now + idx * 0.065;
+
+        gain.gain.value = 0.0001;
+        gain.gain.setValueAtTime(0.0001, startTime);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.05);
+        gain.gain.linearRampToValueAtTime(0.0001, startTime + 2.6);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(startTime);
+        osc.stop(startTime + 3.2);
+      });
+    }
+
+    // ==================== HEART INTERACTIVITY ====================
+    const svg = document.getElementById('heart-svg');
+    const app = document.getElementById('app');
+    const instruction = document.getElementById('instruction');
+    const finalMsg = document.getElementById('final-message');
+    const restartBtn = document.getElementById('restart-btn');
+    const soundBtn = document.getElementById('sound-btn');
+
+    function updateProgress(newProgress) {
+      progress = newProgress;
+      app.style.setProperty('--progress', progress);
+
+      // Make cracks fade beautifully
+      const cracksGroup = document.getElementById('cracks');
+      if (cracksGroup) {
+        const crackOpacity = Math.max(0.06, 0.78 * (1 - progress * 0.95));
+        cracksGroup.style.opacity = crackOpacity;
+      }
+
+      // Increase particle liveliness subtly
+      if (progress > 0.5 && particleCountBase < 52) {
+        particleCountBase = 46;
+      }
+    }
+
+    function fixPiece(pieceEl, pieceId) {
+      if (fixedPieces.has(pieceId) || isComplete) return;
+
+      fixedPieces.add(pieceId);
+
+      // Apply fixed transform (return to center + slight natural settling)
+      pieceEl.classList.add('fixed');
+      pieceEl.style.transform = 'translate(0,0) rotate(0deg)';
+
+      // Soft glow pulse on the piece
+      pieceEl.style.filter = 'brightness(1.35) saturate(1.1)';
+
+      // Create beautiful burst at the piece's visual center
+      const rect = pieceEl.getBoundingClientRect();
+      const burstX = rect.left + rect.width * 0.5;
+      const burstY = rect.top + rect.height * 0.5 + 6;
+      spawnBurst(burstX, burstY, 9 + Math.floor(Math.random() * 4));
+
+      // Sound
+      playSoftChime(pieceId);
+
+      // Update global progress
+      const newProgress = fixedPieces.size / TOTAL_PIECES;
+      updateProgress(newProgress);
+
+      // Remove hover glow after animation
+      setTimeout(() => {
+        if (pieceEl) pieceEl.style.filter = '';
+      }, 520);
+
+      // Check completion
+      if (fixedPieces.size === TOTAL_PIECES) {
+        setTimeout(() => completeHeart(), 680);
+      }
+
+      // Hide instruction after a few pieces
+      if (fixedPieces.size === 1) {
+        instruction.style.transitionDuration = '420ms';
+        instruction.textContent = 'ещё чуть-чуть';
+      }
+      if (fixedPieces.size === 4) {
+        instruction.classList.add('hidden');
+      }
+    }
+
+    function completeHeart() {
+      isComplete = true;
+
+      // Stop breathing
+      svg.classList.remove('breathing');
+      svg.classList.add('complete');
+
+      // Make base heart fully solid and rich when the heart is whole again
+      const base = document.getElementById('base-heart');
+      if (base) base.style.transition = 'opacity 520ms ease';
+      if (base) base.setAttribute('opacity', '1');
+
+      // Hide instruction
+      instruction.classList.add('hidden');
+
+      // Final beautiful burst around the heart
+      const heartRect = svg.getBoundingClientRect();
+      const cx = heartRect.left + heartRect.width / 2;
+      const cy = heartRect.top + heartRect.height / 2;
+
+      // Several layers of particles
+      setTimeout(() => spawnBurst(cx - 40, cy - 20, 16), 80);
+      setTimeout(() => spawnBurst(cx + 36, cy + 10, 14), 190);
+      setTimeout(() => spawnBurst(cx, cy - 55, 11), 310);
+
+      // Final soft chime chord
+      setTimeout(playFinalChime, 240);
+
+      // Reveal the message
+      setTimeout(() => {
+        finalMsg.classList.add('visible');
+      }, 920);
+
+      // Show restart button
+      setTimeout(() => {
+        restartBtn.classList.remove('hidden');
+      }, 1650);
+
+      // Gentle parallax stops feeling right after completion, so we can leave it or soften
+    }
+
+    function resetEverything() {
+      // Reset state
+      isComplete = false;
+      fixedPieces.clear();
+      updateProgress(0);
+
+      // Reset SVG
+      svg.classList.remove('complete');
+      svg.classList.add('breathing');
+
+      // Reset all pieces to broken positions
+      for (let i = 1; i <= TOTAL_PIECES; i++) {
+        const piece = document.getElementById(`piece-${i}`);
+        if (!piece) continue;
+
+        piece.classList.remove('fixed');
+        piece.style.filter = '';
+
+        // Restore original broken transforms
+        const originalTransforms = {
+          1: 'translate(-7.5,-6) rotate(-4.8 100 104)',
+          2: 'translate(7.5,-6) rotate(4.8 100 104)',
+          3: 'translate(-4,1) rotate(-1.8 100 104)',
+          4: 'translate(-5,5) rotate(-2.4 100 104)',
+          5: 'translate(5,5) rotate(2.4 100 104)',
+          6: 'translate(-4,9.5) rotate(-1.6 100 104)',
+          7: 'translate(4,10.5) rotate(1.8 100 104)'
+        };
+        piece.style.transform = originalTransforms[i];
+      }
+
+      // Restore cracks
+      const cracks = document.getElementById('cracks');
+      if (cracks) cracks.style.opacity = '0.82';
+
+      // Reset base heart
+      const base = document.getElementById('base-heart');
+      if (base) base.setAttribute('opacity', '0.96');
+
+      // Hide final message
+      finalMsg.classList.remove('visible');
+
+      // Show instruction again
+      instruction.classList.remove('hidden');
+      instruction.textContent = 'почини его';
+
+      // Hide restart button
+      restartBtn.classList.add('hidden');
+
+      // Reset parallax position of the heart stage
+      const heartStage = document.querySelector('.heart-stage');
+      if (heartStage) heartStage.style.transform = 'translate(0px, 0px)';
+
+      // Extra gentle burst on reset
+      setTimeout(() => {
+        const r = svg.getBoundingClientRect();
+        spawnBurst(r.left + r.width * 0.5, r.top + r.height * 0.38, 7);
+      }, 160);
+
+      // Reset particle intensity
+      particleCountBase = 38;
+    }
+
+    function attachPieceListeners() {
+      for (let i = 1; i <= TOTAL_PIECES; i++) {
+        const piece = document.getElementById(`piece-${i}`);
+        if (!piece) continue;
+
+        // Mouse / touch support
+        piece.addEventListener('click', (e) => {
+          e.stopImmediatePropagation();
+          fixPiece(piece, i);
+        });
+
+        // Keyboard accessibility (Enter / Space on focused piece)
+        piece.setAttribute('tabindex', '0');
+        piece.setAttribute('role', 'button');
+        piece.setAttribute('aria-label', `Часть сердца ${i}`);
+
+        piece.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fixPiece(piece, i);
+          }
+        });
+
+        // Prevent weird highlight drag on mobile
+        piece.addEventListener('touchstart', () => {}, { passive: true });
+      }
+
+      // Allow clicking the whole heart area after completion to restart
+      svg.addEventListener('click', (e) => {
+        if (isComplete) {
+          resetEverything();
+        }
+      });
+    }
+
+    // ==================== PARALLAX ====================
+    let mouseX = 0, mouseY = 0;
+    let targetX = 0, targetY = 0;
+
+    function handleParallax(e) {
+      const rect = app.getBoundingClientRect();
+      targetX = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
+      targetY = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
+    }
+
+    function updateParallax() {
+      // Smooth lerp
+      mouseX += (targetX - mouseX) * 0.072;
+      mouseY += (targetY - mouseY) * 0.072;
+
+      const heartStage = document.querySelector('.heart-stage');
+      if (heartStage && !isComplete) {
+        const tx = mouseX * 5.5;
+        const ty = mouseY * 4.2;
+        heartStage.style.transform = `translate(${tx}px, ${ty}px)`;
+      }
+
+      // Subtle background particle influence
+      if (!isComplete) {
+        for (let i = 0; i < particles.length; i += 3) {
+          const p = particles[i];
+          if (p) {
+            p.vx += mouseX * 0.0016;
+            p.vy += mouseY * 0.0011;
+          }
+        }
+      }
+
+      requestAnimationFrame(updateParallax);
+    }
+
+    // ==================== CONTROLS ====================
+    function setupControls() {
+      // Sound toggle
+      soundBtn.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+
+        const icon = document.getElementById('sound-icon');
+        if (soundEnabled) {
+          icon.textContent = '♪';
+          soundBtn.style.opacity = '1';
+          // Play a soft welcome chime when turning sound on
+          setTimeout(() => {
+            if (soundEnabled) playSoftChime(4);
+          }, 80);
+        } else {
+          icon.textContent = '∅';
+          soundBtn.style.opacity = '0.45';
+        }
+      });
+
+      // Restart
+      restartBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetEverything();
+      });
+
+      // Keyboard restart (R key)
+      document.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'r' && (isComplete || fixedPieces.size > 0)) {
+          resetEverything();
+        }
+        if (e.key.toLowerCase() === 'm') {
+          soundEnabled = !soundEnabled;
+          const icon = document.getElementById('sound-icon');
+          icon.textContent = soundEnabled ? '♪' : '∅';
+          soundBtn.style.opacity = soundEnabled ? '1' : '0.45';
+        }
+      });
+
+      // Click anywhere on final message also restarts
+      finalMsg.addEventListener('click', () => {
+        if (isComplete) resetEverything();
+      });
+    }
+
+    // ==================== INITIALIZATION ====================
+    function init() {
+      resizeCanvas();
+      initParticles();
+      startParticleLoop();
+
+      attachPieceListeners();
+      setupControls();
+      updateParallax();
+
+      // Gentle initial ambient particles burst
+      setTimeout(() => {
+        const r = svg.getBoundingClientRect();
+        spawnBurst(r.left + r.width * 0.5, r.top + r.height * 0.42, 6);
+      }, 650);
+
+      // Random very soft ambient particle additions
+      setInterval(() => {
+        if (!isComplete && particles.length < particleCountBase + 6 && Math.random() < 0.3) {
+          particles.push(new Particle());
+        }
+      }, 5200);
+
+      // Touch friendly: improve mobile hover simulation
+      if ('ontouchstart' in window) {
+        document.documentElement.style.setProperty('--progress', '0');
+      }
+
+      // Handle window resize
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+        // Re-init a few particles on big size changes
+        if (particles.length < 22) {
+          initParticles();
+        }
+      }, { passive: true });
+
+      // Mouse parallax
+      window.addEventListener('mousemove', handleParallax, { passive: true });
+
+      // Accessibility hint in console (dev only)
+      console.log('%c[Романтическая открытка] Нажми на осколки сердца. R — перезапуск, M — звук.', 'color:#6b5b7a');
+
+      // Easter egg: clicking the instruction also gives a hint
+      instruction.addEventListener('click', () => {
+        const heartRect = svg.getBoundingClientRect();
+        spawnBurst(heartRect.left + heartRect.width * 0.3, heartRect.top + 60, 5);
+        spawnBurst(heartRect.left + heartRect.width * 0.7, heartRect.top + 60, 5);
+      });
+    }
+
+    // Boot
+    window.addEventListener('load', init);
+
+    // Small protection: if user somehow selects text, clear it
+    document.addEventListener('selectstart', (e) => {
+      if (e.target.closest('#heart-svg')) e.preventDefault();
+    });
+  </script>
+</body>
+</html>
